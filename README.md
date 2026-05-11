@@ -77,4 +77,4 @@ No shared runtime, UI, or state. See [Design Philosophy §2](docs/design-philoso
 
 ## License
 
-TBD.
+MIT — see [`LICENSE`](LICENSE).

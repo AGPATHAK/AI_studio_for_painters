@@ -115,14 +115,32 @@ Locked decisions, dated. Append-only. Earlier rows are not edited; they are supe
 
 ---
 
+## D7 — 2026-05-11 — License: MIT
+
+**Decision.** The project is released under the MIT License. `LICENSE` at the repo root carries the canonical text. Resolves O2.
+
+**Why.**
+- MIT is permissive, short, well-understood, and standard for small personal/studio tools.
+- Allows any painter or developer to read, fork, and adapt the code without friction.
+- Compatible with the sister app's likely license posture and with any conceivable future redistribution path.
+- No warranty exposure — important for a tool that calls third-party AI services.
+
+**Alternatives rejected.**
+- **Apache 2.0.** Adds an explicit patent grant and a NOTICE file requirement. Useful for larger projects with corporate contributors; overkill here.
+- **GPLv3.** Copyleft is unnecessary; this project gains nothing from forcing downstream openness.
+- **Proprietary / unlicensed.** Would make the repo unusable to anyone else and signals nothing positive.
+
+**Revisit when.** The project takes on contributors who require a CLA, _or_ relicensing is needed to integrate with a differently-licensed dependency.
+
+---
+
 ## Open Decisions
 
 These are flagged here so we don't waste time re-discovering them. None block M0; some block specific later milestones.
 
 ### ~~O1 — Repository name and GitHub Pages slug~~ (Resolved — see D6)
 
-### O2 — License
-TBD (MIT / Apache-2.0 / proprietary). **Resolve before public push.**
+### ~~O2 — License~~ (Resolved — see D7)
 
 ### O3 — Exact critique model id
 `gpt-4o` is the working assumption; the actual model id should be locked at M2a after the prompt set is validated. May need a vision-capable variant for images.
