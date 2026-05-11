@@ -1,6 +1,6 @@
 # Issue 002 — M1 Input + Display Baseline
 
-**Status: Planned**
+**Status: Active — 2026-05-11** (branch `issue-002-m1-input-display`)
 
 ## Goal
 

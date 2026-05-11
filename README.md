@@ -34,7 +34,7 @@ See [`docs/decisions.md`](docs/decisions.md) for the full rationale and open dec
 
 Not yet deployed. Will be published at:
 
-`https://agpathak.github.io/<repo-name>/` once v1 lands.
+<https://agpathak.github.io/AI_studio_for_painters/> once v1 lands.
 
 ## Local Development
 

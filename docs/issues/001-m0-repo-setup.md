@@ -1,6 +1,6 @@
 # Issue 001 — M0 Repo Setup
 
-**Status: Active**
+**Status: Done — 2026-05-11** (commit `e679db1`)
 
 ## Goal
 
@@ -76,9 +76,11 @@ All under repo root and `docs/`. No source code touched.
 
 ## Status / Next Action
 
-**Active.** Next action: confirm the working tree matches acceptance criteria, then run the staging and commit commands provided at session end.
+**Done.** Committed as `e679db1` on `main` on 2026-05-11.
 
-After commit:
-1. Mark this issue as Done.
-2. Make 002 (M1 — Input + Display) the new active issue.
-3. Create branch `issue-002-m1-input-display`.
+Follow-on housekeeping (small commit on `main` after this commit):
+- Lock O1 (repo name) in `decisions.md` → resolved as `AI_studio_for_painters`.
+- Patch the placeholder GitHub Pages URL in `README.md` to the real slug.
+- Switch issue 002 from Planned to Active.
+
+Then: branch `issue-002-m1-input-display` and start M1.

@@ -98,12 +98,28 @@ Locked decisions, dated. Append-only. Earlier rows are not edited; they are supe
 
 ---
 
+## D6 — 2026-05-11 — Repository name: `AI_studio_for_painters`
+
+**Decision.** The repository is named `AI_studio_for_painters`. Local folder, GitHub repo, and (when published) GitHub Pages slug all use this name. Resolves O1.
+
+**Why.**
+- Avoids the apostrophe and spaces of the original folder name, which GitHub and shell tooling do not handle cleanly.
+- Plain ASCII underscored form is consistent with the sister app's `PaintersRef_v5.2` convention.
+- Reads cleanly in URLs without needing percent-encoding.
+
+**Alternatives rejected.**
+- `painter-ai-studio` (lowercase-hyphenated). Reads slightly cleaner in URLs but diverges from the sister app's naming convention.
+- `PaintersAI_v0.1`. Version suffix is premature; a v1.0 rename would be churn.
+
+**Revisit when.** Never expected; rename would require a Pages-URL migration plan and is not justified by anything currently foreseeable.
+
+---
+
 ## Open Decisions
 
 These are flagged here so we don't waste time re-discovering them. None block M0; some block specific later milestones.
 
-### O1 — Repository name and GitHub Pages slug
-The folder is currently `Painter's AI Studio`. GitHub Pages URLs prefer lowercase-hyphenated. Sister app is `PaintersRef_v5.2`. Candidates: `PaintersAI_v0.1`, `painter-ai-studio`, `painters-ai-lab`. **Resolve before first push to GitHub.**
+### ~~O1 — Repository name and GitHub Pages slug~~ (Resolved — see D6)
 
 ### O2 — License
 TBD (MIT / Apache-2.0 / proprietary). **Resolve before public push.**
