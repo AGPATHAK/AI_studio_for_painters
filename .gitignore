@@ -1,0 +1,39 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python (used only for local dev server)
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node (in case anything ever needs it; v1 has no build step)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local secrets / env
+.env
+.env.*
+!.env.example
+
+# Build outputs (none in v1, reserved)
+dist/
+build/
+
+# Scratch
+scratch/
+*.scratch.md
+
+# Reviewer packs / external bundles (per SOP §14)
+reviewer-pack/
+*.reviewer.zip
