@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background — deep charcoal, rounded square (maskable safe zone) -->
+  <rect width="512" height="512" rx="96" fill="#1c1917"/>
+
+  <!-- Painter's palette body -->
+  <ellipse cx="256" cy="272" rx="152" ry="124" fill="#27231f"/>
+
+  <!-- Thumb hole -->
+  <ellipse cx="256" cy="328" rx="36" ry="28" fill="#1c1917"/>
+
+  <!-- Paint dabs — warm studio palette -->
+  <!-- Warm white / titanium -->
+  <circle cx="172" cy="224" r="22" fill="#e8e2d8"/>
+  <!-- Yellow ochre -->
+  <circle cx="224" cy="188" r="20" fill="#c9a84c"/>
+  <!-- Burnt sienna -->
+  <circle cx="278" cy="178" r="20" fill="#b8603a"/>
+  <!-- Ultramarine -->
+  <circle cx="328" cy="198" r="20" fill="#4a6ea8"/>
+  <!-- Sap green -->
+  <circle cx="356" cy="246" r="20" fill="#5a8060"/>
+
+  <!-- Brush handle — diagonal, top-left to lower-centre -->
+  <rect x="118" y="108" width="14" height="110" rx="7"
+        transform="rotate(-38 118 108)" fill="#b8956a"/>
+  <!-- Ferrule -->
+  <rect x="118" y="108" width="14" height="18" rx="3"
+        transform="rotate(-38 118 108)" fill="#cec7bd"/>
+  <!-- Bristle tip -->
+  <ellipse cx="138" cy="124" rx="7" ry="14"
+           transform="rotate(-38 138 124)" fill="#e8e2d8"/>
+</svg>
