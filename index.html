@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="AI-assisted visual reasoning tool for painters. Critique → Correction → Repaint.">
+  <title>AI Painter Studio</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+</head>
+<body>
+
+  <header class="app-header">
+    <h1 class="app-title">AI Painter Studio</h1>
+  </header>
+
+  <div class="app-layout">
+
+    <nav class="controls-rail" aria-label="Tools">
+      <!-- Hidden file input — triggered by Upload button -->
+      <input type="file" id="file-input" accept="image/jpeg,image/png"
+             aria-hidden="true" tabindex="-1">
+
+      <button class="btn btn-primary" id="upload-btn">
+        Upload
+      </button>
+
+      <button class="btn" id="reset-btn" disabled>
+        Reset
+      </button>
+
+      <hr class="rail-divider" aria-hidden="true">
+
+      <button class="btn btn-icon" id="theme-btn"
+              title="Toggle light / dark theme"
+              aria-label="Toggle theme">
+        ☀
+      </button>
+
+      <button class="btn btn-icon" id="settings-btn"
+              title="Settings — available in M2"
+              aria-label="Settings">
+        ⚙
+      </button>
+    </nav>
+
+    <main class="canvas-area" aria-label="Image canvas">
+      <canvas id="main-canvas"
+              role="img"
+              aria-label="Uploaded painting or reference image">
+      </canvas>
+      <p class="empty-state" id="empty-state" aria-live="polite">
+        Load a JPG or PNG to begin
+      </p>
+    </main>
+
+  </div><!-- /.app-layout -->
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('./service-worker.js')
+        .catch(function(err) {
+          console.warn('Service worker registration failed:', err);
+        });
+    }
+  </script>
+
+</body>
+</html>
