@@ -8,7 +8,7 @@ Painters working from photographic references waste effort manually preparing st
 
 ## User
 
-A practicing painter (oils, watercolour, gouache) doing reference-based studio work, often at the easel. Single user for v1 — Ardhendu — but the tool is built to be usable by any painter with the same workflow.
+A practicing painter working primarily in watercolour, with regular work in pastels, acrylics, and charcoal. Does not work in oils. Reference-based studio work, often at a tilted board or table. Single user for v1 — Ardhendu — but the tool is built to be usable by any painter with the same workflow.
 
 ## Job To Be Done
 
