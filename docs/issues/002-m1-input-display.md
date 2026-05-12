@@ -1,6 +1,6 @@
 # Issue 002 — M1 Input + Display Baseline
 
-**Status: Active — 2026-05-11** (branch `issue-002-m1-input-display`)
+**Status: Done — 2026-05-12** (merged to `main`, commits `3bcba3a`–`b699593`)
 
 ## Goal
 
@@ -107,4 +107,7 @@ Manual painter-grade check: image at arm's length is sharp, not pixel-blurry.
 
 ## Status / Next Action
 
-Planned. Becomes active after 001 (M0) commits.
+**Done.** All 8 acceptance criteria passed. Lighthouse PWA score: 100.
+Notable implementation note: theme toggle uses inline SVG with `stroke="currentColor"`
+instead of emoji — macOS system emoji font ignores CSS `color`, making glyphs
+invisible on dark backgrounds.
