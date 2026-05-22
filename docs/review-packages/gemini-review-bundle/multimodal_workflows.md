@@ -20,10 +20,9 @@ The primary workflow is:
 
 1. Upload painting
 2. Diagnose structural issues
-3. Reveal the proposed intervention scope
-4. Explain the teaching principle
-5. Compare critique artifacts or selective corrections
-6. Repaint manually
+3. Select the appropriate teaching workflow
+4. Compare critique artifacts or selective corrections
+5. Repaint manually
 
 The objective is:
 - learning through visual comparison,
@@ -45,24 +44,7 @@ Corrections are teaching artifacts.
 
 ---
 
-## Critique Surface Sequencing
-
-Critique surfaces should not all appear at once.
-
-Preferred sequence:
-1. diagnosis,
-2. scope reveal,
-3. teaching explanation,
-4. demonstration,
-5. repaint guidance.
-
-The priority diagnosis should appear first. Secondary critiques should be hidden, collapsed, or deferred until the painter has understood the main visual lesson.
-
-This pacing protects the painter from trying to solve value, edge, chroma, composition, and detail at the same time.
-
----
-
-## Typical Corrections
+### Typical Corrections
 
 Typical interventions include:
 - reconnecting shadow masses,
@@ -88,24 +70,6 @@ Not every critique should become a demonstration. Use [workflow_selection_logic.
 
 ---
 
-## Scope Reveal Before Demonstration
-
-Before any correction or demonstrative critique appears, the painter should first see:
-- the target passage,
-- the scope class,
-- what will be preserved,
-- and why the scope is appropriate.
-
-This orientation preserves trust. It makes selective intervention visible before the system changes or compares anything.
-
-Preferred order:
-1. diagnosis,
-2. scope reveal,
-3. controlled demonstration,
-4. repaint guidance.
-
----
-
 ## Selective Intervention Philosophy
 
 Global “enhancement” is discouraged.
@@ -115,8 +79,6 @@ Preferred corrections are:
 - interpretable,
 - controlled,
 - and visually explainable.
-
-Demonstrations should be limited. The system should avoid endless variants, correction shopping, and optimization drift. Once the lesson is visible, the next preferred action is repaint planning.
 
 For scope classes and escalation rules, see [intervention_scope_framework.md](intervention_scope_framework.md).
 
@@ -163,28 +125,6 @@ Provide direct visual instruction on the image itself.
 
 ---
 
-### Quiet Overlay Doctrine
-
-Overlays should guide attention without visually dominating the painting.
-
-Preferred overlays are:
-- subtle,
-- sparse,
-- non-destructive,
-- easy to dismiss,
-- and visually subordinate to the painting.
-
-Avoid:
-- aggressive digital markup aesthetics,
-- dense labels,
-- heavy outlines,
-- saturated annotation colors,
-- and overlays that make the painting harder to see.
-
-The overlay should act like a teacher pointing gently at the painting, not like a graphic layer competing with it.
-
----
-
 ### Typical Overlay Guidance
 
 - soften here,
@@ -221,10 +161,6 @@ Accelerate visual learning through comparison.
 ### Purpose
 
 Explore alternate interpretations without losing painter intent.
-
-Variant exploration should be limited and purposeful. A variant should answer a specific visual question, not invite shopping for a better image.
-
-After a useful variant comparison, the system should transition toward repaint guidance.
 
 ---
 
@@ -270,24 +206,7 @@ Useful outputs include:
 - edge economy demonstrations,
 - comparison layouts.
 
-Repaint planning is the terminal educational handoff. It should summarize the next manual attempt rather than invite another round of optimization.
-
 Repaint planning should make the next manual attempt clearer. See [repaintability_framework.md](repaintability_framework.md).
-
----
-
-## Image-First Workflow Doctrine
-
-Multimodal critique should keep the painting visually dominant.
-
-Conceptual priorities:
-- critique text supports looking,
-- overlays remain quiet,
-- comparisons should be focused and few,
-- controls should not compete with the image,
-- tablet and iPad review should preserve enough image area for real looking.
-
-The painter should not have to manage many panels, layers, or modes before seeing the main lesson.
 
 ---
 

@@ -28,28 +28,6 @@ The goal is not:
 
 ---
 
-## AI Tightness Risk in Watercolor
-
-AI correction can easily make watercolor look too explicit.
-
-Common risks:
-- sharpened contours,
-- over-separated forms,
-- smoothed washes,
-- digital polish,
-- and over-clarified detail.
-
-Watercolor often needs:
-- softness,
-- lost edges,
-- blooms and irregularities where they serve the passage,
-- atmospheric merging,
-- and suggestion over description.
-
-Any correction should be judged against freshness and painterly restraint, not only clarity.
-
----
-
 ## Freshness Doctrine
 
 Freshness is considered:
@@ -226,12 +204,9 @@ Repainting is often:
 
 Preferred workflow:
 1. Diagnose
-2. Reveal the limited scope of any proposed correction
-3. Simplify
-4. Rebuild structure
-5. Repaint fresh
-
-Watercolor repaint guidance should arrive quickly after the main lesson is clear. Repeated correction attempts usually move away from freshness.
+2. Simplify
+3. Rebuild structure
+4. Repaint fresh
 
 ---
 

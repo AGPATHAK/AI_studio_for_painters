@@ -17,14 +17,11 @@ The preferred sequence is:
 
 1. Honest diagnosis
 2. Critique type
-3. Priority problem
-4. Scope orientation
-5. Root-cause explanation
-6. Specific intervention or teaching artifact
-7. Repaint guidance
-8. Underlying principle
-
-Secondary issues should be deferred unless they directly support the priority lesson.
+3. Priority problems
+4. Root-cause explanation
+5. Specific interventions
+6. Repaint guidance
+7. Underlying principle
 
 ---
 
@@ -87,39 +84,6 @@ Typical language:
 
 Avoid:
 - using demonstration as a general improvement pass.
-- offering multiple variants before the painter has a repaint plan.
-
----
-
-## Progressive Reveal Language
-
-Preferred pacing:
-- “Start here…”
-- “The main issue is…”
-- “Before changing anything else…”
-- “Keep this passage as it is…”
-- “The secondary issue can wait.”
-
-Avoid:
-- “Also fix…”
-- “Improve everything…”
-- “Try several versions…”
-- lists that make unrelated problems feel equally urgent.
-
----
-
-## Scope Reveal Language
-
-Before a demonstration, name:
-- the target passage,
-- the scope,
-- what will be preserved,
-- and why.
-
-Useful phrasing:
-- “This correction should stay regional: only the background shadow family.”
-- “The focal light and fresh wash should remain untouched.”
-- “A demonstration here would test quieter corners, not redesign the painting.”
 
 ---
 
@@ -280,8 +244,6 @@ Avoid:
 - indiscriminate beautification,
 - and over-rendered corrections.
 
-Demonstrations should be limited. Once a comparison has taught the painter what to repaint, additional variants risk turning critique into shopping.
-
 ---
 
 ## Repaintability Pattern
@@ -312,8 +274,6 @@ The critique system prioritizes:
 
 The goal is not:
 - producing an instantly polished image.
-
-The critique should return the painter to the painting quickly. It should not reward endless digital refinement.
 
 ---
 

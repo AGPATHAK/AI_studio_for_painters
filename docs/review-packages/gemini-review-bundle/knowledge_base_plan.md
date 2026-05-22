@@ -34,24 +34,6 @@ Use these terms consistently across the knowledge base:
 - selective intervention: local, interpretable correction that teaches a painter what to change and why.
 - repaint workflow: diagnosis, simplified planning, manual repainting, and comparison.
 - painterliness: visual authority through selection, abstraction, and brush-led decision-making rather than literal transcription.
-- progressive reveal: staged critique that teaches one major visual lesson at a time.
-- scope reveal: painter orientation before demonstration, naming target, breadth, preserved passages, and purpose.
-- AI tightness bias: tendency toward sharper, clearer, more rendered correction that may weaken painterliness.
-
----
-
-## Governing Workflow Doctrine
-
-Preferred surface sequence:
-1. diagnosis,
-2. scope reveal,
-3. teaching explanation,
-4. demonstration only when useful,
-5. repaint guidance.
-
-The system should preserve painter attention by revealing critique in stages. It should avoid simultaneous multi-axis correction, endless variants, and digital optimization loops.
-
-The painting remains the dominant object. Interface concepts should stay image-first, with restrained critique surfaces and quiet annotations.
 
 ---
 
