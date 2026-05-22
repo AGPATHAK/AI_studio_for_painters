@@ -11,9 +11,9 @@ These heuristics are intended to:
 
 ---
 
-# Value Heuristics
+## Value Grouping Heuristics
 
-## Read from Distance First
+### Read from Distance First
 
 A painting should remain readable:
 - at thumbnail size,
@@ -27,7 +27,7 @@ Loss of readability usually indicates:
 
 ---
 
-## Preserve Dominant Masses
+### Preserve Dominant Masses
 
 Strong paintings usually contain:
 - a few dominant connected shapes,
@@ -45,7 +45,7 @@ Avoid:
 
 ---
 
-## Merge Shadows Aggressively
+### Merge Shadows Aggressively
 
 Shadows should usually behave as:
 - large architectural structures,
@@ -57,7 +57,7 @@ Recurring doctrine:
 
 ---
 
-## Compress Secondary Values
+### Compress Secondary Values
 
 Not all areas deserve full tonal range.
 
@@ -71,9 +71,9 @@ Reserve strongest contrast for focal hierarchy.
 
 ---
 
-# Edge Heuristics
+## Edge Economy Heuristics
 
-## Hard Edges Are Expensive
+### Hard Edges Are Expensive
 
 Hard edges attract attention.
 
@@ -86,7 +86,7 @@ Avoid equal edge sharpness everywhere.
 
 ---
 
-## Lose More Edges Than Feels Comfortable
+### Lose More Edges Than Feels Comfortable
 
 Atmosphere often improves when:
 - contours dissolve,
@@ -101,7 +101,7 @@ Especially useful in:
 
 ---
 
-## Edge Variety Creates Life
+### Edge Variety Creates Life
 
 Good paintings contain:
 - lost edges,
@@ -113,9 +113,9 @@ Uniform edge treatment creates stiffness.
 
 ---
 
-# Composition Heuristics
+## Composition Heuristics
 
-## Protect Focal Hierarchy
+### Protect Focal Hierarchy
 
 The eye should know:
 - where to enter,
@@ -130,7 +130,7 @@ Focal hierarchy is controlled through:
 
 ---
 
-## Quiet the Corners
+### Quiet the Corners
 
 Corners should rarely compete with the focal area.
 
@@ -142,7 +142,7 @@ Reduce:
 
 ---
 
-## Avoid Tangent Clutter
+### Avoid Tangent Clutter
 
 Touching shapes create visual tension.
 
@@ -155,9 +155,9 @@ Avoid accidental alignments.
 
 ---
 
-# Chroma Heuristics
+## Chroma Hierarchy Heuristics
 
-## Chroma Must Be Budgeted
+### Chroma Must Be Budgeted
 
 High saturation everywhere weakens atmosphere.
 
@@ -168,7 +168,7 @@ Reserve strongest chroma for:
 
 ---
 
-## Neutralize Secondary Passages
+### Neutralize Secondary Passages
 
 Backgrounds and supporting areas usually benefit from:
 - muted mixtures,
@@ -177,7 +177,7 @@ Backgrounds and supporting areas usually benefit from:
 
 ---
 
-## Temperature Supports Depth
+### Temperature Supports Depth
 
 Typical atmospheric pattern:
 - warmer foregrounds,
@@ -186,9 +186,9 @@ Typical atmospheric pattern:
 
 ---
 
-# Simplification Heuristics
+## Simplification Heuristics
 
-## Paint Masses Before Objects
+### Paint Masses Before Objects
 
 Large shape relationships matter more than:
 - object identity,
@@ -197,7 +197,7 @@ Large shape relationships matter more than:
 
 ---
 
-## Remove Before Adding
+### Remove Before Adding
 
 Recurring critique question:
 > What can be removed without harming the painting?
@@ -209,9 +209,11 @@ Simplification usually strengthens:
 
 ---
 
-# Watercolor Heuristics
+## Watercolor Heuristics
 
-## Freshness Is Fragile
+For medium-specific limits around freshness, glazing, paper fatigue, and repaint decisions, see [watercolor_specific_doctrine.md](watercolor_specific_doctrine.md).
+
+### Freshness Is Fragile
 
 Repeated correction often damages:
 - luminosity,
@@ -223,7 +225,7 @@ When overworked:
 
 ---
 
-## Preserve Whites Early
+### Preserve Whites Early
 
 Watercolor light is usually planned, not recovered.
 
@@ -231,9 +233,11 @@ Protect paper whites before complexity develops.
 
 ---
 
-# AI-Assisted Critique Heuristics
+## AI-Assisted Critique Heuristics
 
-## Corrections Should Be Selective
+For reusable instruction modules that express these heuristics in controlled AI-assisted workflows, see [prompt_primitives.md](prompt_primitives.md).
+
+### Corrections Should Be Selective
 
 Avoid global “improvement.”
 
@@ -244,7 +248,7 @@ Preferred:
 
 ---
 
-## Demonstrate, Do Not Replace
+### Demonstrate, Do Not Replace
 
 AI corrections exist to:
 - teach,

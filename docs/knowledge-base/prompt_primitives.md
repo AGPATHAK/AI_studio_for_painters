@@ -16,255 +16,263 @@ The emphasis is:
 
 ---
 
-# Value Structure Primitives
+## Value Structure Primitives
 
-## Shadow Mass Simplification
+### Shadow Mass Simplification
 
-### Intent
+#### Intent
 Reconnect fragmented shadow structures.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - merge disconnected shadows,
 - reduce tonal fragmentation,
 - simplify into dominant masses,
 - preserve focal hierarchy.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger readability,
 - cleaner value design,
 - improved atmosphere.
 
 ---
 
-## Midtone Compression
+### Midtone Compression
 
-### Intent
+#### Intent
 Reduce unnecessary tonal activity.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - compress secondary midtones,
 - quiet background contrast,
 - subordinate nonessential passages.
 
-### Desired Outcome
+#### Desired Outcome
 - clearer focal structure,
 - calmer composition,
 - reduced visual noise.
 
 ---
 
-# Edge Control Primitives
+## Edge Economy Primitives
 
-## Edge Reduction
+### Edge Reduction
 
-### Intent
+#### Intent
 Reduce excessive contour competition.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - soften secondary edges,
 - lose background contours,
 - preserve only focal sharpness.
 
-### Desired Outcome
+#### Desired Outcome
 - improved atmosphere,
 - stronger hierarchy,
 - more painterly abstraction.
 
 ---
 
-## Lost-and-Found Edge Enhancement
+### Lost-and-Found Edge Enhancement
 
-### Intent
+#### Intent
 Introduce edge variety and atmospheric transitions.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - dissolve selected contours,
 - merge adjacent passages,
 - preserve selective edge accents.
 
-### Desired Outcome
+#### Desired Outcome
 - greater depth,
 - softer atmosphere,
 - stronger visual rhythm.
 
 ---
 
-# Chroma Control Primitives
+## Chroma Hierarchy Primitives
 
-## Secondary Chroma Reduction
+### Secondary Chroma Reduction
 
-### Intent
+#### Intent
 Prevent saturation competition.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - mute nonessential chroma,
 - introduce atmospheric greys,
 - preserve strongest saturation near focal area.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger depth,
 - calmer composition,
 - improved focal emphasis.
 
 ---
 
-## Atmospheric Cooling
+### Atmospheric Cooling
 
-### Intent
+#### Intent
 Improve spatial depth.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - cool distant passages,
 - reduce distant contrast,
 - soften atmospheric transitions.
 
-### Desired Outcome
+#### Desired Outcome
 - enhanced spatial separation,
 - improved atmospheric perspective.
 
 ---
 
-# Simplification Primitives
+## Simplification Primitives
 
-## Detail Suppression
+### Detail Suppression
 
-### Intent
+#### Intent
 Reduce decorative clutter.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - simplify secondary detail,
 - merge repetitive marks,
 - reduce descriptive noise.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger mass relationships,
 - cleaner composition,
 - improved readability.
 
 ---
 
-## Floral Simplification
+### Floral Simplification
 
-### Intent
+#### Intent
 Prevent overdescribed petals and clutter.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - group petals into masses,
 - simplify floral structure,
 - preserve only selective accents.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger focal hierarchy,
 - improved atmosphere,
 - cleaner flower handling.
 
 ---
 
-# Composition Primitives
+## Composition Primitives
 
-## Corner Quieting
+### Corner Quieting
 
-### Intent
+#### Intent
 Reduce edge distraction and visual leakage.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - soften corner activity,
 - reduce edge contrast near borders,
 - simplify peripheral detail.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger containment,
 - improved eye movement,
 - cleaner composition.
 
 ---
 
-## Focal Reinforcement
+### Focal Reinforcement
 
-### Intent
+#### Intent
 Strengthen visual priority.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - deepen focal contrast,
 - sharpen focal transitions,
 - reduce competition elsewhere.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger eye guidance,
 - clearer hierarchy,
 - improved visual impact.
 
 ---
 
-# Watercolor Primitives
+## Watercolor Primitives
 
-## Freshness Preservation
+These primitives should respect the material constraints in [watercolor_specific_doctrine.md](watercolor_specific_doctrine.md), especially freshness, transparency, and paper integrity.
 
-### Intent
+### Freshness Preservation
+
+#### Intent
 Maintain watercolor vitality.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - preserve wash transparency,
 - avoid over-rendering,
 - maintain soft transitions,
 - protect paper luminosity.
 
-### Desired Outcome
+#### Desired Outcome
 - fresher handling,
 - improved watercolor character,
 - reduced digital appearance.
 
 ---
 
-## Wash Unification
+### Wash Unification
 
-### Intent
+#### Intent
 Reduce patchiness and fragmentation.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - unify connected passages,
 - simplify wash transitions,
 - reduce unnecessary interruptions.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger flow,
 - improved cohesion,
 - calmer surface behavior.
 
 ---
 
-# AI Correction Doctrine
+## AI-Assisted Correction Doctrine
 
-## Controlled Intervention
+### Controlled Intervention
 
-### Intent
+#### Intent
 Avoid destructive global transformation.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - isolate weak regions,
 - preserve successful passages,
 - apply selective corrections only.
 
-### Desired Outcome
+#### Desired Outcome
 - interpretable edits,
 - preserved painter identity,
 - educational usefulness.
 
 ---
 
-# Educational Doctrine
+## Educational Doctrine
 
-## Demonstration over Replacement
+### Demonstration over Replacement
 
-### Intent
+#### Intent
 Use AI as teaching support.
 
-### Typical Prompt Logic
+#### Typical Prompt Logic
 - demonstrate alternatives,
 - clarify structural issues,
 - support repaint planning.
 
-### Desired Outcome
+#### Desired Outcome
 - stronger artistic judgment,
 - improved repaint decisions,
 - transferable learning.
+
+---
+
+## Relationship to Critique Workflow
+
+Prompt primitives are not standalone style recipes. They operationalize the diagnoses in [common_failure_modes.md](common_failure_modes.md), the visual logic in [visual_heuristics.md](visual_heuristics.md), and the repaint-centered workflow in [multimodal_workflows.md](multimodal_workflows.md).

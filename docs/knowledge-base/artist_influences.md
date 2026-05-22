@@ -16,9 +16,9 @@ not:
 
 ---
 
-# Edward Wesson
+## Edward Wesson
 
-## What Is Valued
+### What Is Valued
 
 Edward Wesson strongly influenced the project’s emphasis on:
 - atmospheric simplification,
@@ -29,9 +29,9 @@ Edward Wesson strongly influenced the project’s emphasis on:
 
 ---
 
-## Major Lessons
+### Major Lessons
 
-### Large Shape Dominance
+#### Large Shape Dominance
 
 Complex scenes should often be reduced into:
 - a few dominant masses,
@@ -45,7 +45,7 @@ This directly shaped:
 
 ---
 
-### Edge Economy
+#### Edge Economy
 
 Wesson uses:
 - selective sharpness,
@@ -57,12 +57,12 @@ Recurring lesson:
 
 This heavily influenced:
 - lost-and-found edge philosophy,
-- edge budgeting,
+- edge economy,
 - and focal hierarchy critique.
 
 ---
 
-### Atmospheric Editing
+#### Atmospheric Editing
 
 Wesson often suppresses:
 - unnecessary detail,
@@ -78,7 +78,7 @@ This inspired recurring critique guidance:
 
 ---
 
-## Palette Tendencies
+### Palette Tendencies
 
 Typical Wesson-like characteristics:
 - muted earths,
@@ -91,9 +91,9 @@ High chroma is used sparingly.
 
 ---
 
-# Edward Seago
+## Edward Seago
 
-## What Is Valued
+### What Is Valued
 
 Edward Seago influenced the project’s emphasis on:
 - atmosphere,
@@ -104,9 +104,9 @@ Edward Seago influenced the project’s emphasis on:
 
 ---
 
-## Major Lessons
+### Major Lessons
 
-### High-Key Structure
+#### High-Key Structure
 
 Seago often works with:
 - compressed value ranges,
@@ -120,7 +120,7 @@ This shaped:
 
 ---
 
-### Atmosphere Through Omission
+#### Atmosphere Through Omission
 
 Seago frequently avoids:
 - excessive detail,
@@ -132,7 +132,7 @@ Recurring lesson:
 
 ---
 
-### Tonal Cohesion
+#### Tonal Cohesion
 
 Seago’s paintings feel unified because:
 - values remain compressed,
@@ -141,12 +141,12 @@ Seago’s paintings feel unified because:
 
 This strongly influenced:
 - tonal unity critique,
-- chroma restraint philosophy,
+- chroma hierarchy,
 - and atmospheric workflows.
 
 ---
 
-# Line-and-Wash Traditions
+## Line-and-Wash Traditions
 
 The project also draws from line-and-wash traditions emphasizing:
 - selective drawing,
@@ -160,7 +160,7 @@ not imprison them.
 
 ---
 
-# Restrained Palette Doctrine
+## Restrained Palette Doctrine
 
 Repeatedly preferred characteristics:
 - limited pigments,
@@ -182,7 +182,7 @@ Reasoning:
 
 ---
 
-# Atmospheric Simplification
+## Atmospheric Simplification
 
 A central influence across multiple artists.
 
@@ -198,7 +198,13 @@ Methods include:
 
 ---
 
-# Influence on Critique Philosophy
+## Relationship to Critique Philosophy
+
+These influences are source lineages, not style targets. When influence language appears in workflow prompts, it should point to transferable principles such as atmospheric simplification, value grouping, edge economy, or chroma hierarchy rather than asking for imitation.
+
+---
+
+## Influence on Critique Philosophy
 
 These artistic influences collectively shaped the system toward:
 - painterliness over realism,

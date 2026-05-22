@@ -12,7 +12,7 @@ The goal is to transform accumulated critique discussions, workflows, and artist
 
 ---
 
-# Core Principle
+## Core Principle
 
 This phase is:
 - conceptual,
@@ -23,9 +23,23 @@ Implementation comes later.
 
 ---
 
-# Planned Canonical Documents
+## Canonical Vocabulary
 
-## 1. painting_critique_philosophy.md
+Use these terms consistently across the knowledge base:
+- value grouping: the organization of lights, midtones, and darks into readable masses.
+- focal hierarchy: the ordered control of contrast, edge sharpness, chroma, and detail density.
+- edge economy: selective use of hard, soft, lost, and broken edges.
+- chroma hierarchy: controlled saturation that supports depth, focus, and atmosphere.
+- atmospheric simplification: omission, softening, compression, and grouping in service of air and depth.
+- selective intervention: local, interpretable correction that teaches a painter what to change and why.
+- repaint workflow: diagnosis, simplified planning, manual repainting, and comparison.
+- painterliness: visual authority through selection, abstraction, and brush-led decision-making rather than literal transcription.
+
+---
+
+## Planned Canonical Documents
+
+### 1. painting_critique_philosophy.md
 Core doctrines:
 - role of critique
 - role of AI
@@ -36,18 +50,18 @@ Core doctrines:
 
 ---
 
-## 2. visual_heuristics.md
+### 2. visual_heuristics.md
 Operational visual principles:
 - value grouping
-- edge hierarchy
+- edge economy
 - focal contrast
-- chroma control
+- chroma hierarchy
 - atmosphere
 - simplification
 
 ---
 
-## 3. common_failure_modes.md
+### 3. common_failure_modes.md
 Structured diagnostic handbook:
 - symptoms
 - causes
@@ -57,7 +71,7 @@ Structured diagnostic handbook:
 
 ---
 
-## 4. artist_influences.md
+### 4. artist_influences.md
 Pedagogical extraction from:
 - Edward Wesson
 - Edward Seago
@@ -69,7 +83,7 @@ Focus:
 
 ---
 
-## 5. multimodal_workflows.md
+### 5. multimodal_workflows.md
 AI-assisted workflows:
 - critique overlays
 - repaint simulations
@@ -80,7 +94,7 @@ AI-assisted workflows:
 
 ---
 
-## 6. critique_patterns.md
+### 6. critique_patterns.md
 Reusable critique language:
 - diagnosis templates
 - intervention phrasing
@@ -89,7 +103,7 @@ Reusable critique language:
 
 ---
 
-## 7. watercolor_specific_doctrine.md
+### 7. watercolor_specific_doctrine.md
 Medium-specific guidance:
 - freshness
 - glazing
@@ -100,7 +114,7 @@ Medium-specific guidance:
 
 ---
 
-## 8. prompt_primitives.md
+### 8. prompt_primitives.md
 Reusable AI instruction modules:
 - simplify shadows
 - reduce edge count
@@ -110,7 +124,20 @@ Reusable AI instruction modules:
 
 ---
 
-# Future Direction
+## Document Relationships
+
+- [painting_critique_philosophy.md](painting_critique_philosophy.md) is the doctrinal center.
+- [visual_heuristics.md](visual_heuristics.md) translates doctrine into recurring visual principles.
+- [common_failure_modes.md](common_failure_modes.md) turns those principles into diagnostic categories.
+- [critique_patterns.md](critique_patterns.md) stabilizes the language used to teach those diagnoses.
+- [prompt_primitives.md](prompt_primitives.md) turns critique language into reusable AI-assisted instruction modules.
+- [multimodal_workflows.md](multimodal_workflows.md) defines how critique artifacts support repaint decisions.
+- [watercolor_specific_doctrine.md](watercolor_specific_doctrine.md) constrains the system for watercolor’s material realities.
+- [artist_influences.md](artist_influences.md) records painterly lineages without asking for imitation.
+
+---
+
+## Future Direction
 
 After stabilization:
 - critique schema design
@@ -123,7 +150,7 @@ After stabilization:
 
 ---
 
-# Guiding Heuristic
+## Guiding Heuristic
 
 The system exists to help painters:
 - see better,

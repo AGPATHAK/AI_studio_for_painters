@@ -13,7 +13,7 @@ The focus is:
 
 ---
 
-# Core Philosophy
+## Core Philosophy
 
 Watercolor is treated as:
 - a medium of controlled surrender,
@@ -28,7 +28,7 @@ The goal is not:
 
 ---
 
-# Freshness Doctrine
+## Freshness Doctrine
 
 Freshness is considered:
 - fragile,
@@ -46,7 +46,7 @@ Recurring principle:
 
 ---
 
-# White Preservation Doctrine
+## White Preservation Doctrine
 
 Watercolor light usually comes from:
 - preserved paper,
@@ -60,7 +60,7 @@ Preferred workflow:
 
 ---
 
-# Edge Doctrine
+## Edge Economy Doctrine
 
 Edges are treated as:
 - primary compositional tools.
@@ -78,7 +78,7 @@ Avoid:
 
 ---
 
-# Wash Doctrine
+## Wash Doctrine
 
 Good washes typically appear:
 - confident,
@@ -97,7 +97,7 @@ Avoid:
 
 ---
 
-# Glazing Doctrine
+## Glazing Doctrine
 
 Glazing is preferred over:
 - scrubbing,
@@ -105,14 +105,14 @@ Glazing is preferred over:
 - or muddy repainting.
 
 Useful glazing goals:
-- chroma control,
+- chroma hierarchy,
 - atmospheric cooling,
 - shadow unification,
 - value deepening.
 
 ---
 
-# Simplification Doctrine
+## Simplification Doctrine
 
 Watercolor benefits strongly from:
 - shape economy,
@@ -131,7 +131,7 @@ Avoid:
 
 ---
 
-# Atmospheric Doctrine
+## Atmospheric Simplification Doctrine
 
 Atmosphere often improves through:
 - softened edges,
@@ -145,7 +145,7 @@ Recurring principle:
 
 ---
 
-# Brushwork Doctrine
+## Brushwork Doctrine
 
 Brushwork should:
 - support rhythm,
@@ -164,7 +164,7 @@ Avoid:
 
 ---
 
-# Color Doctrine
+## Chroma Hierarchy Doctrine
 
 Preferred watercolor color handling:
 - restrained palettes,
@@ -179,7 +179,7 @@ High chroma should be:
 
 ---
 
-# Paper Integrity Doctrine
+## Paper Integrity Doctrine
 
 Paper fatigue is treated seriously.
 
@@ -194,7 +194,7 @@ Once surface vitality is lost:
 
 ---
 
-# Repaint Doctrine
+## Repaint Workflow Doctrine
 
 A repaint is not considered failure.
 
@@ -210,7 +210,13 @@ Preferred workflow:
 
 ---
 
-# Guiding Watercolor Question
+## Relationship to Workflows
+
+These constraints should shape the selective interventions in [multimodal_workflows.md](multimodal_workflows.md) and the watercolor primitives in [prompt_primitives.md](prompt_primitives.md). The point is not to make corrections look finished, but to help the painter choose when to preserve, glaze, simplify, or repaint fresh.
+
+---
+
+## Guiding Watercolor Question
 
 At every stage ask:
 > Is this passage becoming fresher or more labored?

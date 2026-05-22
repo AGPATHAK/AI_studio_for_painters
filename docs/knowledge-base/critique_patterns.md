@@ -7,11 +7,11 @@ This document captures recurring critique language, diagnostic structures, and i
 The goal is to create:
 - consistent critique behavior,
 - reusable reasoning structures,
-- and future AI-operational critique modules.
+- and future AI-assisted critique modules.
 
 ---
 
-# Preferred Critique Structure
+## Preferred Critique Structure
 
 The preferred sequence is:
 
@@ -24,21 +24,21 @@ The preferred sequence is:
 
 ---
 
-# Diagnosis Patterns
+## Diagnosis Patterns
 
-## Strong Diagnostic Language
+### Strong Diagnostic Language
 
 Preferred phrasing:
 - “The painting weakens where…”
 - “The eye gets trapped because…”
 - “This area competes unnecessarily.”
 - “The value structure fragments here.”
-- “This edge hierarchy collapses because…”
+- “This edge economy collapses because…”
 - “The chroma hierarchy is flattening depth.”
 
 ---
 
-## Weak Diagnostic Language
+### Weak Diagnostic Language
 
 Avoid:
 - vague praise,
@@ -54,9 +54,9 @@ Examples to avoid:
 
 ---
 
-# Value Critique Patterns
+## Value Critique Patterns
 
-## Typical Diagnoses
+### Typical Diagnoses
 
 - shadow masses are fragmented,
 - midtones are overactive,
@@ -66,7 +66,7 @@ Examples to avoid:
 
 ---
 
-## Typical Interventions
+### Typical Interventions
 
 - merge shadow structures,
 - compress secondary values,
@@ -76,9 +76,9 @@ Examples to avoid:
 
 ---
 
-# Edge Critique Patterns
+## Edge Economy Critique Patterns
 
-## Typical Diagnoses
+### Typical Diagnoses
 
 - too many hard edges,
 - equal edge sharpness everywhere,
@@ -87,7 +87,7 @@ Examples to avoid:
 
 ---
 
-## Typical Interventions
+### Typical Interventions
 
 - soften background contours,
 - lose nonessential edges,
@@ -97,9 +97,9 @@ Examples to avoid:
 
 ---
 
-# Composition Critique Patterns
+## Composition Critique Patterns
 
-## Typical Diagnoses
+### Typical Diagnoses
 
 - corners compete unnecessarily,
 - focal hierarchy is weak,
@@ -108,7 +108,7 @@ Examples to avoid:
 
 ---
 
-## Typical Interventions
+### Typical Interventions
 
 - quiet corner activity,
 - simplify secondary passages,
@@ -117,9 +117,9 @@ Examples to avoid:
 
 ---
 
-# Chroma Critique Patterns
+## Chroma Hierarchy Critique Patterns
 
-## Typical Diagnoses
+### Typical Diagnoses
 
 - saturation competes everywhere,
 - chroma flattens atmosphere,
@@ -127,7 +127,7 @@ Examples to avoid:
 
 ---
 
-## Typical Interventions
+### Typical Interventions
 
 - mute secondary chroma,
 - introduce atmospheric greys,
@@ -136,9 +136,9 @@ Examples to avoid:
 
 ---
 
-# Watercolor Critique Patterns
+## Watercolor Critique Patterns
 
-## Typical Diagnoses
+### Typical Diagnoses
 
 - washes feel overworked,
 - paper freshness is damaged,
@@ -146,7 +146,7 @@ Examples to avoid:
 
 ---
 
-## Typical Interventions
+### Typical Interventions
 
 - repaint instead of patching,
 - simplify washes,
@@ -156,9 +156,9 @@ Examples to avoid:
 
 ---
 
-# Repaint Guidance Patterns
+## Repaint Guidance Patterns
 
-## Preferred Guidance
+### Preferred Guidance
 
 Useful repaint advice:
 - “Rebuild the shadow mass first.”
@@ -169,7 +169,7 @@ Useful repaint advice:
 
 ---
 
-# Selective Intervention Doctrine
+## Selective Intervention Doctrine
 
 Preferred corrections isolate:
 - the weak region,
@@ -183,7 +183,7 @@ Avoid:
 
 ---
 
-# Educational Critique Doctrine
+## Educational Critique Doctrine
 
 The critique system prioritizes:
 - visual understanding,
@@ -195,24 +195,30 @@ The goal is not:
 
 ---
 
-# Recurring Guiding Questions
+## Relationship to Other Documents
 
-## Design
+Use [common_failure_modes.md](common_failure_modes.md) for diagnostic categories, [visual_heuristics.md](visual_heuristics.md) for the underlying visual logic, and [prompt_primitives.md](prompt_primitives.md) when the same critique needs to become a controlled AI-assisted correction instruction.
+
+---
+
+## Recurring Guiding Questions
+
+### Design
 - What is the dominant visual statement?
 - Does the painting read from distance?
 
-## Values
+### Values
 - Are the darks connected?
 - Are the midtones too active?
 
-## Edges
+### Edges
 - Which edges deserve attention?
 - Which edges can disappear?
 
-## Color
+### Color
 - Is chroma controlled hierarchically?
 - Does color support depth?
 
-## Atmosphere
+### Atmosphere
 - Is the painting breathing?
 - Is simplification sufficient?

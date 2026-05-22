@@ -4,7 +4,7 @@
 
 This document captures recurring painting weaknesses identified throughout critique sessions.
 
-Each issue includes:
+Each issue uses a lightweight diagnostic pattern that may include:
 - symptoms,
 - likely causes,
 - visual consequences,
@@ -13,157 +13,157 @@ Each issue includes:
 
 ---
 
-# Value Structure Failures
+## Value Structure Failures
 
-## Fragmented Value Structure
+### Fragmented Value Structure
 
-### Symptoms
+#### Symptoms
 - noisy appearance,
 - weak readability,
 - scattered darks,
 - no dominant mass.
 
-### Likely Causes
+#### Likely Causes
 - copying photo detail literally,
 - excessive small contrasts,
 - isolated tonal decisions.
 
-### Consequences
+#### Consequences
 - weak atmosphere,
 - visual confusion,
 - poor distance read.
 
-### Corrections
+#### Corrections
 - merge shadow families,
 - simplify midtones,
 - remove isolated accents.
 
-### Repaint Strategy
+#### Repaint Strategy
 Rebuild major value masses first before detail.
 
 ---
 
-## Weak Focal Contrast
+### Weak Focal Contrast
 
-### Symptoms
+#### Symptoms
 - unclear emphasis,
 - wandering eye,
 - equal importance everywhere.
 
-### Causes
+#### Likely Causes
 - uniform contrast,
 - insufficient focal separation.
 
-### Corrections
+#### Corrections
 - deepen focal darks,
 - reduce peripheral contrast,
 - sharpen focal transitions selectively.
 
 ---
 
-# Edge Failures
+## Edge Failures
 
-## Too Many Hard Edges
+### Too Many Hard Edges
 
-### Symptoms
+#### Symptoms
 - stiffness,
 - visual noise,
 - loss of atmosphere.
 
-### Causes
+#### Likely Causes
 - outlining mentality,
 - fear of losing structure,
 - over-definition.
 
-### Corrections
+#### Corrections
 - soften secondary contours,
 - merge adjacent values,
 - reduce edge count aggressively.
 
 ---
 
-## Edge Equality
+### Edge Equality
 
-### Symptoms
+#### Symptoms
 - everything competes,
 - weak hierarchy,
 - restless viewing.
 
-### Causes
+#### Likely Causes
 - uniform treatment across painting.
 
-### Corrections
+#### Corrections
 - reserve sharp edges,
 - subordinate secondary passages,
 - lose background contours.
 
 ---
 
-# Composition Failures
+## Composition Failures
 
-## Tangent Clutter
+### Tangent Clutter
 
-### Symptoms
+#### Symptoms
 - awkward touching forms,
 - accidental tension,
 - visual irritation.
 
-### Causes
+#### Likely Causes
 - literal copying,
 - insufficient shape editing.
 
-### Corrections
+#### Corrections
 - separate shapes clearly,
 - overlap decisively,
 - simplify intersections.
 
 ---
 
-## Corner Noise
+### Corner Noise
 
-### Symptoms
+#### Symptoms
 - eye trapped near edges,
 - weak containment,
 - compositional leakage.
 
-### Corrections
+#### Corrections
 - reduce corner detail,
 - lower corner contrast,
 - soften edge activity.
 
 ---
 
-# Chroma Failures
+## Chroma Failures
 
-## Excessive Chroma Everywhere
+### Excessive Chroma Everywhere
 
-### Symptoms
+#### Symptoms
 - loudness,
 - visual fatigue,
 - weak atmosphere.
 
-### Causes
+#### Likely Causes
 - overuse of pure pigments,
 - insufficient neutralization.
 
-### Corrections
+#### Corrections
 - mute secondary passages,
 - preserve strongest chroma near focal area,
 - introduce atmospheric greys.
 
 ---
 
-## Decorative Color Without Structure
+### Decorative Color Without Structure
 
-### Symptoms
+#### Symptoms
 - attractive but incoherent color,
 - shallow depth,
 - weak unity.
 
-### Causes
+#### Likely Causes
 - color choices disconnected from value structure.
 
-### Corrections
+#### Corrections
 - tie color to:
   - depth,
   - temperature,
@@ -172,125 +172,133 @@ Rebuild major value masses first before detail.
 
 ---
 
-# Simplification Failures
+## Simplification Failures
 
-## Detail Addiction
+### Detail Addiction
 
-### Symptoms
+#### Symptoms
 - fragmented field,
 - weak atmosphere,
 - loss of dominance.
 
-### Causes
+#### Likely Causes
 - treating all objects equally,
 - over-description.
 
-### Corrections
+#### Corrections
 - paint masses before objects,
 - remove unnecessary marks,
 - simplify secondary forms.
 
 ---
 
-# Watercolor Failures
+## Watercolor Failures
 
-## Overworking
+For the material reasons these failures matter, see [watercolor_specific_doctrine.md](watercolor_specific_doctrine.md).
 
-### Symptoms
+### Overworking
+
+#### Symptoms
 - muddy passages,
 - dead surface,
 - chalky handling,
 - damaged paper.
 
-### Causes
+#### Likely Causes
 - repeated correction,
 - excessive lifting,
 - patching late-stage mistakes.
 
-### Corrections
+#### Corrections
 - stop earlier,
 - repaint fresh passages,
 - preserve wash integrity.
 
-### Doctrine
+#### Doctrine
 Freshness is usually more valuable than incremental correction.
 
 ---
 
-# Depth Failures
+## Depth Failures
 
-## Flat Spatial Depth
+### Flat Spatial Depth
 
-### Symptoms
+#### Symptoms
 - weak separation of planes,
 - compressed space,
 - lack of atmosphere.
 
-### Causes
+#### Likely Causes
 - equal edge clarity,
 - equal chroma,
 - equal contrast.
 
-### Corrections
+#### Corrections
 - soften distant forms,
 - cool distant passages,
 - reduce distant detail.
 
 ---
 
-# Floral Handling Failures
+## Floral Handling Failures
 
-## Overdescribed Petals
+### Overdescribed Petals
 
-### Symptoms
+#### Symptoms
 - busy flowers,
 - decorative clutter,
 - weak focal hierarchy.
 
-### Causes
+#### Likely Causes
 - painting petals individually,
 - insufficient grouping.
 
-### Corrections
+#### Corrections
 - simplify flowers into masses,
 - merge petals into value families,
 - reserve selective accents only.
 
 ---
 
-# Landscape Failures
+## Landscape Failures
 
-## Broken Shadow Architecture
+### Broken Shadow Architecture
 
-### Symptoms
+#### Symptoms
 - disconnected landscape structure,
 - spotty shadow behavior,
 - weak unity.
 
-### Causes
+#### Likely Causes
 - object-by-object shadow painting.
 
-### Corrections
+#### Corrections
 - design connected shadow patterns,
 - think architecturally,
 - unify major dark passages.
 
 ---
 
-# Architectural Handling Failures
+## Architectural Handling Failures
 
-## Excessive Structural Precision
+### Excessive Structural Precision
 
-### Symptoms
+#### Symptoms
 - rigidity,
 - loss of atmosphere,
 - drafting appearance.
 
-### Causes
+#### Likely Causes
 - over-drawing,
 - excessive line dependence.
 
-### Corrections
+#### Corrections
 - suppress unnecessary detail,
 - soften selective contours,
 - allow washes to dominate structure.
+
+---
+
+## Relationship to Critique Language
+
+These failure modes are diagnostic categories. For reusable phrasing that teaches the same issues without becoming formulaic, see [critique_patterns.md](critique_patterns.md). For AI-assisted correction modules aligned to these categories, see [prompt_primitives.md](prompt_primitives.md).

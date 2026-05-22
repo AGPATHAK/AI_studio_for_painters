@@ -14,7 +14,7 @@ The repaint remains central.
 
 ---
 
-# Core Workflow
+## Core Workflow
 
 The primary workflow is:
 
@@ -31,9 +31,9 @@ not:
 
 ---
 
-# Critique → Correction → Repaint
+## Critique → Correction → Repaint
 
-## Purpose
+### Purpose
 
 The correction stage exists to:
 - demonstrate stronger design decisions,
@@ -44,7 +44,7 @@ Corrections are teaching artifacts.
 
 ---
 
-## Typical Corrections
+### Typical Corrections
 
 Typical interventions include:
 - reconnecting shadow masses,
@@ -57,7 +57,7 @@ Typical interventions include:
 
 ---
 
-# Selective Intervention Philosophy
+## Selective Intervention Philosophy
 
 Global “enhancement” is discouraged.
 
@@ -69,15 +69,15 @@ Preferred corrections are:
 
 ---
 
-# Value-Only Workflows
+## Value-Only Workflows
 
-## Purpose
+### Purpose
 
 Separate structural value problems from color distraction.
 
 ---
 
-## Typical Sequence
+### Typical Sequence
 
 1. Convert to grayscale
 2. Evaluate major masses
@@ -87,7 +87,7 @@ Separate structural value problems from color distraction.
 
 ---
 
-# Notan and Tonal Mask Workflows
+## Notan and Tonal Mask Workflows
 
 Recurring tools:
 - grayscale studies,
@@ -102,15 +102,15 @@ These workflows support:
 
 ---
 
-# Overlay-Based Teaching
+## Overlay-Based Teaching
 
-## Purpose
+### Purpose
 
 Provide direct visual instruction on the image itself.
 
 ---
 
-## Typical Overlay Guidance
+### Typical Overlay Guidance
 
 - soften here,
 - merge these shapes,
@@ -122,15 +122,15 @@ Provide direct visual instruction on the image itself.
 
 ---
 
-# Side-by-Side Comparison Workflows
+## Side-by-Side Comparison Workflows
 
-## Purpose
+### Purpose
 
 Accelerate visual learning through comparison.
 
 ---
 
-## Typical Comparisons
+### Typical Comparisons
 
 - original vs corrected,
 - simplified vs fragmented,
@@ -141,15 +141,15 @@ Accelerate visual learning through comparison.
 
 ---
 
-# Variant Exploration Workflows
+## Variant Exploration Workflows
 
-## Purpose
+### Purpose
 
 Explore alternate interpretations without losing painter intent.
 
 ---
 
-## Typical Variants
+### Typical Variants
 
 - stronger shadow grouping,
 - quieter background,
@@ -160,7 +160,7 @@ Explore alternate interpretations without losing painter intent.
 
 ---
 
-# Region-Specific Edit Logic
+## Region-Specific Edit Logic
 
 A recurring doctrine:
 
@@ -176,7 +176,7 @@ This mirrors traditional studio critique.
 
 ---
 
-# Repaint Planning Workflows
+## Repaint Planning Workflows
 
 The system repeatedly emphasizes:
 - repaint preparation,
@@ -186,12 +186,12 @@ Useful outputs include:
 - value maps,
 - simplified studies,
 - tonal sheets,
-- edge hierarchy demonstrations,
+- edge economy demonstrations,
 - comparison layouts.
 
 ---
 
-# PRL Relationship
+## PRL Relationship
 
 Painter’s Reference Lab (PRL) acts as:
 - deterministic visual analysis support.
@@ -208,7 +208,7 @@ not probabilistic reinterpretation.
 
 ---
 
-# AI Painter Studio Relationship
+## AI Painter Studio Relationship
 
 AI Painter Studio extends into:
 - interpretive critique,
@@ -221,7 +221,13 @@ However:
 
 ---
 
-# Future Workflow Direction
+## Relationship to Prompt Primitives
+
+When a workflow needs a repeatable instruction unit, use [prompt_primitives.md](prompt_primitives.md). When a workflow needs a diagnostic category, use [common_failure_modes.md](common_failure_modes.md). For watercolor handling limits, defer to [watercolor_specific_doctrine.md](watercolor_specific_doctrine.md).
+
+---
+
+## Future Workflow Direction
 
 The long-term direction emphasizes:
 - AI as diagnostic collaborator,

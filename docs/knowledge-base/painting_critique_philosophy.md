@@ -14,20 +14,20 @@ The goal is not:
 
 ---
 
-# Core Doctrine
+## Core Doctrine
 
 The system prioritizes:
 
 1. Shape design
 2. Value structure
-3. Edge hierarchy
+3. Edge economy
 4. Atmospheric coherence
 5. Color orchestration
 6. Detail
 
 ---
 
-# Role of AI
+## Role of AI
 
 AI functions as:
 - diagnostic assistant,
@@ -42,7 +42,7 @@ AI is NOT:
 
 ---
 
-# Critique → Correction → Repaint Loop
+## Critique → Correction → Repaint Loop
 
 The core workflow is:
 
@@ -56,7 +56,7 @@ The repaint is considered essential.
 
 ---
 
-# Painterliness over Photorealism
+## Painterliness over Photorealism
 
 The critique philosophy strongly favors:
 - abstraction,
@@ -71,6 +71,16 @@ over:
 
 ---
 
-# Guiding Question
+## Relationship to Operational Documents
+
+This philosophy is the doctrinal source for:
+- [visual_heuristics.md](visual_heuristics.md), where principles become visual checks,
+- [critique_patterns.md](critique_patterns.md), where principles become teaching language,
+- [multimodal_workflows.md](multimodal_workflows.md), where corrections remain subordinate to repaint learning,
+- and [prompt_primitives.md](prompt_primitives.md), where AI instructions are kept selective and painter-centered.
+
+---
+
+## Guiding Question
 
 > Does this help the painter see and decide better?
