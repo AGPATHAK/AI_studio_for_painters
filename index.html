@@ -32,29 +32,60 @@
         Reset
       </button>
 
+      <button class="btn" id="critique-btn" disabled>
+        Crit
+      </button>
+
       <hr class="rail-divider" aria-hidden="true">
 
       <button class="btn btn-icon" id="theme-btn"
               title="Toggle light / dark theme"
               aria-label="Toggle theme">
-        ☀
-      </button>
-
-      <button class="btn btn-icon" id="settings-btn"
-              title="Settings — available in M2"
-              aria-label="Settings">
-        ⚙
+        <!-- icon set by applyTheme() in app.js -->
       </button>
     </nav>
 
-    <main class="canvas-area" aria-label="Image canvas">
-      <canvas id="main-canvas"
-              role="img"
-              aria-label="Uploaded painting or reference image">
-      </canvas>
-      <p class="empty-state" id="empty-state" aria-live="polite">
-        Load a JPG or PNG to begin
-      </p>
+    <main class="studio-stage" aria-label="Critique workspace">
+      <section class="canvas-area" aria-label="Image canvas">
+        <canvas id="main-canvas"
+                role="img"
+                aria-label="Uploaded painting or reference image">
+        </canvas>
+        <p class="empty-state" id="empty-state" aria-live="polite">
+          Load a JPG or PNG to begin
+        </p>
+      </section>
+
+      <aside class="critique-panel" id="critique-panel" aria-live="polite">
+        <p class="panel-kicker">Value structure</p>
+        <h2 class="panel-title">One visual lesson</h2>
+        <p class="panel-copy" id="critique-message">
+          Upload a painting, then run the minimal critique loop.
+        </p>
+
+        <div class="panel-section" id="scope-section" hidden>
+          <p class="section-label">Scope</p>
+          <p>Mid-ground shadow family. The focal light and outer passages stay untouched.</p>
+        </div>
+
+        <div class="panel-section" id="demo-section" hidden>
+          <p class="section-label">Demonstration</p>
+          <p>A quiet value grouping pass shows how scattered darks can behave as one calmer mass.</p>
+        </div>
+
+        <div class="panel-section" id="repaint-section" hidden>
+          <p class="section-label">Repaint handoff</p>
+          <ol class="repaint-list">
+            <li>Rebuild the mid-ground shadow as one connected value family.</li>
+            <li>Preserve the main light shape and freshest washes.</li>
+            <li>Add accents only after the large shadow mass reads clearly.</li>
+          </ol>
+        </div>
+
+        <button class="btn-panel" id="next-step-btn" disabled>
+          Run critique
+        </button>
+      </aside>
     </main>
 
   </div><!-- /.app-layout -->
