@@ -6,6 +6,8 @@
 
 This roadmap operationalizes the design philosophy into an executable, critique-aligned plan.
 
+Note: this v1 roadmap primarily describes the in-progress critique and repaint loop. The broader product roadmap is now organized around three workflows: Reference Ideation, In-Progress Guidance, and Finished Painting Review. See [Workflow-Oriented Roadmap Architecture](roadmap/workflow_architecture.md).
+
 It incorporates:
 - critique → edit linkage
 - iteration-first UX
