@@ -101,6 +101,15 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
 
 const ctx = canvas.getContext('2d');
 
+/* ── Runtime config ──────────────────────────────────────────────────────── */
+
+const APP_CONFIG = {
+  semanticEndpointStorageKey: 'aps:semanticEndpoint',
+  localStaticFrontendPort: '8081',
+  localSemanticProxyOrigin: 'http://127.0.0.1:8080',
+  sameOriginSemanticPath: '/api/semantic'
+};
+
 const WORKFLOW_MODES = {
   REFERENCE_IDEATION: 'reference-ideation',
   IN_PROGRESS_GUIDANCE: 'in-progress-guidance',
@@ -248,7 +257,18 @@ const SEMANTIC_INTERPRETATION_PROMPT = [
 ].join(' ');
 
 function getSemanticEndpoint() {
-  return localStorage.getItem('aps:semanticEndpoint') || '/api/semantic';
+  const override = localStorage.getItem(APP_CONFIG.semanticEndpointStorageKey);
+  if (override) return override;
+
+  const isLocalFrontend =
+    ['127.0.0.1', 'localhost'].includes(window.location.hostname) &&
+    window.location.port === APP_CONFIG.localStaticFrontendPort;
+
+  if (isLocalFrontend) {
+    return `${APP_CONFIG.localSemanticProxyOrigin}${APP_CONFIG.sameOriginSemanticPath}`;
+  }
+
+  return APP_CONFIG.sameOriginSemanticPath;
 }
 
 function getWorkflowMode() {

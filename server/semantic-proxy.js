@@ -20,6 +20,10 @@ loadEnv(path.join(ROOT_DIR, '.env'));
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '127.0.0.1';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+const LOCAL_DEV_ALLOWED_ORIGINS = new Set([
+  'http://127.0.0.1:8081',
+  'http://localhost:8081'
+]);
 
 const WORKFLOW_MODES = {
   REFERENCE_IDEATION: 'reference-ideation',
@@ -129,10 +133,18 @@ const REFERENCE_IDEATION_SCHEMA = {
 };
 
 const server = http.createServer(async (req, res) => {
+  let isSemanticRequest = false;
+
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    isSemanticRequest = url.pathname === '/api/semantic';
 
-    if (url.pathname === '/api/semantic') {
+    if (isSemanticRequest && req.method === 'OPTIONS') {
+      sendSemanticPreflight(req, res);
+      return;
+    }
+
+    if (isSemanticRequest) {
       await handleSemantic(req, res);
       return;
     }
@@ -145,7 +157,11 @@ const server = http.createServer(async (req, res) => {
     serveStatic(url.pathname, req, res);
   } catch (err) {
     console.error('APS proxy: request failed:', err);
-    sendJson(res, 500, { error: 'proxy_error' });
+    if (isSemanticRequest) {
+      sendSemanticJson(req, res, 500, { error: 'proxy_error' });
+    } else {
+      sendJson(res, 500, { error: 'proxy_error' });
+    }
   }
 });
 
@@ -157,12 +173,12 @@ server.listen(PORT, HOST, () => {
 async function handleSemantic(req, res) {
   console.log('APS proxy: semantic request received');
   if (req.method !== 'POST') {
-    sendJson(res, 405, { error: 'method_not_allowed' });
+    sendSemanticJson(req, res, 405, { error: 'method_not_allowed' });
     return;
   }
 
   if (!process.env.GEMINI_API_KEY) {
-    sendJson(res, 503, { error: 'missing_gemini_api_key' });
+    sendSemanticJson(req, res, 503, { error: 'missing_gemini_api_key' });
     return;
   }
 
@@ -172,13 +188,13 @@ async function handleSemantic(req, res) {
   const workflowMode = normalizeWorkflowMode(body.workflowMode);
 
   if (!image || !['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
-    sendJson(res, 400, { error: 'invalid_image' });
+    sendSemanticJson(req, res, 400, { error: 'invalid_image' });
     return;
   }
 
   const semantic = await callGeminiSemanticPass(image, mimeType, workflowMode);
   console.log(`APS proxy: ${workflowMode} object created`);
-  sendJson(res, 200, semantic);
+  sendSemanticJson(req, res, 200, semantic);
 }
 
 async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
@@ -792,6 +808,33 @@ function sendJson(res, status, payload) {
     'Cache-Control': 'no-store'
   });
   res.end(JSON.stringify(payload));
+}
+
+function sendSemanticJson(req, res, status, payload) {
+  const headers = {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Cache-Control': 'no-store'
+  };
+  addLocalDevCorsHeaders(req, headers);
+  res.writeHead(status, headers);
+  res.end(JSON.stringify(payload));
+}
+
+function sendSemanticPreflight(req, res) {
+  const headers = { 'Cache-Control': 'no-store' };
+  addLocalDevCorsHeaders(req, headers);
+  res.writeHead(204, headers);
+  res.end();
+}
+
+function addLocalDevCorsHeaders(req, headers) {
+  const origin = req.headers.origin;
+  if (!LOCAL_DEV_ALLOWED_ORIGINS.has(origin)) return;
+
+  headers['Access-Control-Allow-Origin'] = origin;
+  headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
+  headers['Access-Control-Allow-Headers'] = 'Content-Type';
+  headers.Vary = 'Origin';
 }
 
 function sendText(res, status, text) {
