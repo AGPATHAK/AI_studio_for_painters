@@ -25,6 +25,7 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+!server/.env.example
 
 # Build outputs (none in v1, reserved)
 dist/

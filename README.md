@@ -46,6 +46,16 @@ python3 -m http.server 8080
 
 Then open <http://localhost:8080>.
 
+For the Gemini semantic pass, run the local proxy instead of the static Python server:
+
+```bash
+cp server/.env.example server/.env
+# edit server/.env and set GEMINI_API_KEY
+node server/semantic-proxy.js
+```
+
+Then open <http://localhost:8080>. The API key stays in `server/.env` and is never sent to the browser.
+
 ## Project Files (planned)
 
 - `index.html` — app shell and controls

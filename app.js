@@ -30,6 +30,10 @@ const appState = {
     filename: null    // original filename | null
   },
   semantic: null,       // narrowly scoped scene labels and value-family hints
+  semanticStatus: {
+    source: 'none',     // none | gemini | fallback
+    state: 'unavailable'
+  },
   critiqueStep: 'idle'  // idle | diagnosis | scope | demo | repaint
 };
 
@@ -43,6 +47,7 @@ const canvas      = document.getElementById('main-canvas');
 const emptyState  = document.getElementById('empty-state');
 const critiquePanel   = document.getElementById('critique-panel');
 const critiqueMessage = document.getElementById('critique-message');
+const semanticSource  = document.getElementById('semantic-source');
 const semanticSection = document.getElementById('semantic-section');
 const semanticCopy    = document.getElementById('semantic-copy');
 const scopeSection    = document.getElementById('scope-section');
@@ -56,9 +61,9 @@ const nextStepBtn     = document.getElementById('next-step-btn');
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !canvas || !emptyState || !critiquePanel || !critiqueMessage ||
-    !semanticSection || !semanticCopy || !scopeSection || !scopeCopy ||
-    !demoSection || !demoCopy || !repaintSection || !repaintList ||
-    !nextStepBtn) {
+    !semanticSource || !semanticSection || !semanticCopy || !scopeSection ||
+    !scopeCopy || !demoSection || !demoCopy || !repaintSection ||
+    !repaintList || !nextStepBtn) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -159,7 +164,7 @@ const SEMANTIC_INTERPRETATION_PROMPT = [
 ].join(' ');
 
 function getSemanticEndpoint() {
-  return localStorage.getItem('aps:semanticEndpoint') || '';
+  return localStorage.getItem('aps:semanticEndpoint') || '/api/semantic';
 }
 
 function normalizeSemanticInterpretation(raw, bitmap) {
@@ -184,7 +189,7 @@ function normalizeSemanticInterpretation(raw, bitmap) {
     : fallback.valueFamilies;
 
   return {
-    source: safe.source || 'api',
+    source: safe.source || 'gemini',
     sceneSummary: String(safe.sceneSummary || fallback.sceneSummary),
     regions,
     valueFamilies,
@@ -220,36 +225,62 @@ async function requestSemanticInterpretation(file, bitmap) {
   console.log('APS: semantic pass start');
   const fallback = getFallbackSemanticInterpretation(bitmap);
   const endpoint = getSemanticEndpoint();
-  if (!endpoint) {
-    console.log('APS: semantic pass fallback');
-    console.log('APS: semantic pass complete');
-    return fallback;
-  }
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 2200);
-  const formData = new FormData();
-  formData.append('image', file);
-  formData.append('purpose', 'scene_regions_and_value_families_only');
-  formData.append('prompt', SEMANTIC_INTERPRETATION_PROMPT);
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
 
   try {
+    const imageData = await fileToBase64(file);
     const response = await fetch(endpoint, {
       method: 'POST',
-      body: formData,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: imageData,
+        mimeType: file.type,
+        filename: file.name,
+        purpose: 'scene_regions_and_value_families_only',
+        prompt: SEMANTIC_INTERPRETATION_PROMPT
+      }),
       signal: controller.signal
     });
     if (!response.ok) throw new Error(`semantic endpoint returned ${response.status}`);
     const payload = await response.json();
-    return normalizeSemanticInterpretation(payload, bitmap);
+    const semantic = normalizeSemanticInterpretation(payload, bitmap);
+    return {
+      semantic,
+      status: {
+        source: semantic.source === 'gemini' ? 'gemini' : 'fallback',
+        state: semantic.source === 'gemini' ? 'succeeded' : 'fallback',
+        detail: ''
+      }
+    };
   } catch (err) {
     console.warn('APS: semantic interpretation fallback used:', err);
     console.log('APS: semantic pass fallback');
-    return fallback;
+    return {
+      semantic: fallback,
+      status: {
+        source: 'fallback',
+        state: err.name === 'AbortError' ? 'unavailable' : 'fallback',
+        detail: ''
+      }
+    };
   } finally {
     console.log('APS: semantic pass complete');
     window.clearTimeout(timeoutId);
   }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      resolve(result.includes(',') ? result.split(',').pop() : result);
+    };
+    reader.onerror = () => reject(reader.error || new Error('failed to read image'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function getTargetValueFamily() {
@@ -276,6 +307,21 @@ function refreshSemanticCopy() {
     return;
   }
   semanticCopy.textContent = `Major regions: ${getRegionReadout()}.`;
+}
+
+function refreshSemanticSource() {
+  const status = appState.semanticStatus;
+  semanticSource.hidden = (status.source === 'none');
+
+  if (status.source === 'gemini') {
+    semanticSource.textContent = 'Semantic source: Gemini Vision - semantic pass succeeded';
+  } else if (status.state === 'unavailable') {
+    semanticSource.textContent = 'Semantic source: Local fallback interpretation - semantic unavailable';
+  } else if (status.source === 'fallback') {
+    semanticSource.textContent = 'Semantic source: Local fallback interpretation - semantic fallback used';
+  } else {
+    semanticSource.textContent = 'Semantic source: waiting for image';
+  }
 }
 
 function refreshCritiqueCopy(step) {
@@ -445,6 +491,7 @@ function setCritiqueStep(step) {
   critiquePanel.dataset.step = step;
 
   refreshSemanticCopy();
+  refreshSemanticSource();
   refreshCritiqueCopy(step);
 
   nextStepBtn.disabled = !appState.image.bitmap || step === 'repaint';
@@ -495,13 +542,16 @@ fileInput.addEventListener('change', async () => {
     appState.image.srcUrl   = url;
     appState.image.filename = file.name;
     appState.semantic       = null;
+    appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.critiqueStep   = 'idle';
 
     showCanvas();
     renderCanvas(bitmap);
     console.log('APS: upload complete');
 
-    appState.semantic       = await requestSemanticInterpretation(file, bitmap);
+    const semanticResult = await requestSemanticInterpretation(file, bitmap);
+    appState.semantic = semanticResult.semantic;
+    appState.semanticStatus = semanticResult.status;
 
     setCritiqueStep('diagnosis');
     renderCanvas(bitmap);
@@ -511,6 +561,7 @@ fileInput.addEventListener('change', async () => {
     URL.revokeObjectURL(url);
     appState.image = { bitmap: null, srcUrl: null, filename: null };
     appState.semantic = null;
+    appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.critiqueStep = 'idle';
     showEmptyState();
   }
@@ -530,6 +581,7 @@ resetBtn.addEventListener('click', () => {
   }
   appState.image = { bitmap: null, srcUrl: null, filename: null };
   appState.semantic = null;
+  appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.critiqueStep = 'idle';
   showEmptyState();
 });
