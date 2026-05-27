@@ -7,7 +7,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'apsv1-shell-2026-05-24a';
+const CACHE_NAME = 'apsv1-shell-2026-05-27b';
 
 /** Files that make up the installable app shell. */
 const SHELL_FILES = [
@@ -52,6 +52,14 @@ self.addEventListener('fetch', event => {
 
   const reqUrl = new URL(req.url);
   if (reqUrl.origin !== self.location.origin) return;
+
+  // During local development, always read the app shell from disk/network.
+  // Otherwise an older installed PWA shell can mask current HTML/CSS/JS edits.
+  const isLocalDev = ['localhost', '127.0.0.1', '::1'].includes(reqUrl.hostname);
+  if (isLocalDev) {
+    event.respondWith(fetch(req));
+    return;
+  }
 
   // Cache-first: serve from cache, fall back to network
   event.respondWith(

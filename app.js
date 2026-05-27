@@ -1,7 +1,8 @@
 /* ==========================================================================
    AI Painter Studio — app.js
    Minimal critique loop prototype: upload, one value diagnosis,
-   one quiet scope overlay, one demonstration, one repaint handoff.
+   one semantic scene read, one quiet scope overlay, one demonstration,
+   one repaint handoff.
    ========================================================================== */
 
 'use strict';
@@ -28,7 +29,8 @@ const appState = {
     srcUrl:   null,   // ObjectURL string | null
     filename: null    // original filename | null
   },
-  critiqueStep: 'idle' // idle | diagnosis | scope | demo | repaint
+  semantic: null,       // narrowly scoped scene labels and value-family hints
+  critiqueStep: 'idle'  // idle | diagnosis | scope | demo | repaint
 };
 
 /* ── DOM refs ─────────────────────────────────────────────────────────────── */
@@ -41,15 +43,22 @@ const canvas      = document.getElementById('main-canvas');
 const emptyState  = document.getElementById('empty-state');
 const critiquePanel   = document.getElementById('critique-panel');
 const critiqueMessage = document.getElementById('critique-message');
+const semanticSection = document.getElementById('semantic-section');
+const semanticCopy    = document.getElementById('semantic-copy');
 const scopeSection    = document.getElementById('scope-section');
+const scopeCopy       = document.getElementById('scope-copy');
 const demoSection     = document.getElementById('demo-section');
+const demoCopy        = document.getElementById('demo-copy');
 const repaintSection  = document.getElementById('repaint-section');
+const repaintList     = document.getElementById('repaint-list');
 const nextStepBtn     = document.getElementById('next-step-btn');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !canvas || !emptyState || !critiquePanel || !critiqueMessage ||
-    !scopeSection || !demoSection || !repaintSection || !nextStepBtn) {
+    !semanticSection || !semanticCopy || !scopeSection || !scopeCopy ||
+    !demoSection || !demoCopy || !repaintSection || !repaintList ||
+    !nextStepBtn) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -117,6 +126,198 @@ themeBtn.addEventListener('click', () => {
   const current = document.documentElement.getAttribute('data-theme') || 'light';
   applyTheme(current === 'dark' ? 'light' : 'dark');
 });
+
+/* ── Semantic interpretation ──────────────────────────────────────────────── */
+
+const DEFAULT_SEMANTIC_INTERPRETATION = {
+  source: 'fallback',
+  sceneSummary: 'landscape with sky, distant land, water, and foreground growth',
+  regions: [
+    { id: 'sky', label: 'sky opening', position: 'upper field' },
+    { id: 'distant_land', label: 'distant mountain or far shoreline', position: 'upper mid-ground' },
+    { id: 'waterbody', label: 'central waterbody', position: 'middle field' },
+    { id: 'shoreline', label: 'shoreline dark accents', position: 'mid-ground band' },
+    { id: 'vegetation', label: 'foreground vegetation', position: 'lower field' }
+  ],
+  valueFamilies: [
+    {
+      id: 'target_shadow_family',
+      label: 'shoreline and water-shadow band',
+      role: 'dominant shadow family',
+      position: 'mid-ground',
+      regionIds: ['shoreline', 'waterbody']
+    }
+  ],
+  protectedPassages: ['sky opening', 'main light shape', 'fresh outer washes']
+};
+
+const SEMANTIC_INTERPRETATION_PROMPT = [
+  'Identify only scene regions and connected shadow/value families.',
+  'Do not critique, improve, generate, beautify, or prescribe edits.',
+  'Return concise JSON: sceneSummary, regions[{id,label,position}],',
+  'valueFamilies[{id,label,role,position,regionIds}], protectedPassages[].'
+].join(' ');
+
+function getSemanticEndpoint() {
+  return localStorage.getItem('aps:semanticEndpoint') || '';
+}
+
+function normalizeSemanticInterpretation(raw, bitmap) {
+  const fallback = getFallbackSemanticInterpretation(bitmap);
+  const safe = (raw && typeof raw === 'object') ? raw : {};
+  const regions = Array.isArray(safe.regions) && safe.regions.length
+    ? safe.regions.map((region, index) => ({
+      id: String(region.id || `region_${index + 1}`),
+      label: String(region.label || fallback.regions[index]?.label || 'scene region'),
+      position: String(region.position || fallback.regions[index]?.position || 'within the painting')
+    }))
+    : fallback.regions;
+
+  const valueFamilies = Array.isArray(safe.valueFamilies) && safe.valueFamilies.length
+    ? safe.valueFamilies.map((family, index) => ({
+      id: String(family.id || `value_family_${index + 1}`),
+      label: String(family.label || fallback.valueFamilies[index]?.label || 'connected shadow family'),
+      role: String(family.role || fallback.valueFamilies[index]?.role || 'value family'),
+      position: String(family.position || fallback.valueFamilies[index]?.position || 'mid-ground'),
+      regionIds: Array.isArray(family.regionIds) ? family.regionIds.map(String) : []
+    }))
+    : fallback.valueFamilies;
+
+  return {
+    source: safe.source || 'api',
+    sceneSummary: String(safe.sceneSummary || fallback.sceneSummary),
+    regions,
+    valueFamilies,
+    protectedPassages: Array.isArray(safe.protectedPassages) && safe.protectedPassages.length
+      ? safe.protectedPassages.map(String)
+      : fallback.protectedPassages
+  };
+}
+
+function getFallbackSemanticInterpretation(bitmap) {
+  const interpretation = JSON.parse(JSON.stringify(DEFAULT_SEMANTIC_INTERPRETATION));
+  if (bitmap && bitmap.height > bitmap.width * 1.15) {
+    interpretation.sceneSummary = 'vertical scene with upper background, central subject mass, and lower shadow base';
+    interpretation.regions = [
+      { id: 'upper_background', label: 'upper background plane', position: 'upper field' },
+      { id: 'central_subject', label: 'central subject mass', position: 'middle field' },
+      { id: 'lower_base', label: 'lower base shadow', position: 'lower field' }
+    ];
+    interpretation.valueFamilies = [
+      {
+        id: 'target_shadow_family',
+        label: 'central subject and lower-base shadow family',
+        role: 'dominant shadow family',
+        position: 'middle-to-lower passage',
+        regionIds: ['central_subject', 'lower_base']
+      }
+    ];
+  }
+  return interpretation;
+}
+
+async function requestSemanticInterpretation(file, bitmap) {
+  console.log('APS: semantic pass start');
+  const fallback = getFallbackSemanticInterpretation(bitmap);
+  const endpoint = getSemanticEndpoint();
+  if (!endpoint) {
+    console.log('APS: semantic pass fallback');
+    console.log('APS: semantic pass complete');
+    return fallback;
+  }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 2200);
+  const formData = new FormData();
+  formData.append('image', file);
+  formData.append('purpose', 'scene_regions_and_value_families_only');
+  formData.append('prompt', SEMANTIC_INTERPRETATION_PROMPT);
+
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`semantic endpoint returned ${response.status}`);
+    const payload = await response.json();
+    return normalizeSemanticInterpretation(payload, bitmap);
+  } catch (err) {
+    console.warn('APS: semantic interpretation fallback used:', err);
+    console.log('APS: semantic pass fallback');
+    return fallback;
+  } finally {
+    console.log('APS: semantic pass complete');
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function getTargetValueFamily() {
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  return semantic.valueFamilies[0];
+}
+
+function getProtectedPassages() {
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  return semantic.protectedPassages.join(', ');
+}
+
+function getRegionReadout() {
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  return semantic.regions
+    .slice(0, 5)
+    .map(region => `${region.label} (${region.position})`)
+    .join('; ');
+}
+
+function refreshSemanticCopy() {
+  if (!appState.semantic) {
+    semanticCopy.textContent = 'Scene labels will be used only to ground the value critique.';
+    return;
+  }
+  semanticCopy.textContent = `Major regions: ${getRegionReadout()}.`;
+}
+
+function refreshCritiqueCopy(step) {
+  const family = getTargetValueFamily();
+  const protectedPassages = getProtectedPassages();
+  const familyLabel = family.label;
+  const familyPosition = family.position;
+
+  scopeCopy.textContent = `${familyLabel}, in the ${familyPosition}. ${protectedPassages} stay untouched.`;
+  demoCopy.textContent = `A quiet value grouping pass shows how the ${familyLabel} can behave as one calmer mass.`;
+
+  repaintList.replaceChildren(
+    makeListItem(`Rebuild the ${familyLabel} as one connected value family.`),
+    makeListItem(`Preserve the ${protectedPassages}.`),
+    makeListItem('Add accents only after the large shadow mass reads clearly.')
+  );
+
+  if (step === 'idle') {
+    critiqueMessage.textContent = appState.image.bitmap
+      ? 'Scene structure is labeled. Run the minimal critique loop when ready.'
+      : 'Upload a painting, then run the minimal critique loop.';
+    nextStepBtn.textContent = 'Run critique';
+  } else if (step === 'diagnosis') {
+    critiqueMessage.textContent = `The dominant shadow structure fragments through the ${familyLabel}, weakening the painting's value cohesion.`;
+    nextStepBtn.textContent = 'Reveal scope';
+  } else if (step === 'scope') {
+    critiqueMessage.textContent = `One regional intervention is proposed: group the ${familyLabel} while preserving the main light and outer passages.`;
+    nextStepBtn.textContent = 'Show demonstration';
+  } else if (step === 'demo') {
+    critiqueMessage.textContent = `The demonstration quietly groups the ${familyPosition} values. It is a study aid, not a finished correction.`;
+    nextStepBtn.textContent = 'Repaint guidance';
+  } else if (step === 'repaint') {
+    critiqueMessage.textContent = `Return to the painting with one task: rebuild the ${familyLabel} before adding accents.`;
+    nextStepBtn.textContent = 'Repaint next';
+  }
+}
+
+function makeListItem(text) {
+  const item = document.createElement('li');
+  item.textContent = text;
+  return item;
+}
 
 /* ── Canvas render ────────────────────────────────────────────────────────── */
 
@@ -232,30 +433,19 @@ function showEmptyState() {
 }
 
 function setCritiqueStep(step) {
+  console.log(`APS: critique render trigger: ${step}`);
   appState.critiqueStep = step;
 
+  semanticSection.hidden = !(step === 'diagnosis' || step === 'scope' ||
+                             step === 'demo' || step === 'repaint');
   scopeSection.hidden = !(step === 'scope' || step === 'demo' || step === 'repaint');
   demoSection.hidden = !(step === 'demo' || step === 'repaint');
   repaintSection.hidden = (step !== 'repaint');
 
   critiquePanel.dataset.step = step;
 
-  if (step === 'idle') {
-    critiqueMessage.textContent = 'Upload a painting, then run the minimal critique loop.';
-    nextStepBtn.textContent = 'Run critique';
-  } else if (step === 'diagnosis') {
-    critiqueMessage.textContent = 'The dominant shadow structure fragments through the mid-ground, weakening the painting’s value cohesion.';
-    nextStepBtn.textContent = 'Reveal scope';
-  } else if (step === 'scope') {
-    critiqueMessage.textContent = 'One regional intervention is proposed: group the mid-ground shadow family while preserving the main light and outer passages.';
-    nextStepBtn.textContent = 'Show demonstration';
-  } else if (step === 'demo') {
-    critiqueMessage.textContent = 'The demonstration quietly groups the mid-ground values. It is a study aid, not a finished correction.';
-    nextStepBtn.textContent = 'Repaint guidance';
-  } else if (step === 'repaint') {
-    critiqueMessage.textContent = 'Return to the painting with one task: rebuild the main shadow family before adding accents.';
-    nextStepBtn.textContent = 'Repaint next';
-  }
+  refreshSemanticCopy();
+  refreshCritiqueCopy(step);
 
   nextStepBtn.disabled = !appState.image.bitmap || step === 'repaint';
 
@@ -286,6 +476,7 @@ uploadBtn.addEventListener('click', () => {
 });
 
 fileInput.addEventListener('change', async () => {
+  console.log('APS: upload event fired');
   const file = fileInput.files[0];
   if (!file) return;
 
@@ -303,16 +494,23 @@ fileInput.addEventListener('change', async () => {
     appState.image.bitmap   = bitmap;
     appState.image.srcUrl   = url;
     appState.image.filename = file.name;
+    appState.semantic       = null;
     appState.critiqueStep   = 'idle';
 
     showCanvas();
-    setCritiqueStep('idle');
+    renderCanvas(bitmap);
+    console.log('APS: upload complete');
+
+    appState.semantic       = await requestSemanticInterpretation(file, bitmap);
+
+    setCritiqueStep('diagnosis');
     renderCanvas(bitmap);
 
   } catch (err) {
     console.error('APS: failed to decode image:', err);
     URL.revokeObjectURL(url);
     appState.image = { bitmap: null, srcUrl: null, filename: null };
+    appState.semantic = null;
     appState.critiqueStep = 'idle';
     showEmptyState();
   }
@@ -331,6 +529,7 @@ resetBtn.addEventListener('click', () => {
     URL.revokeObjectURL(appState.image.srcUrl);
   }
   appState.image = { bitmap: null, srcUrl: null, filename: null };
+  appState.semantic = null;
   appState.critiqueStep = 'idle';
   showEmptyState();
 });
