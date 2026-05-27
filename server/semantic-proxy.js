@@ -22,54 +22,48 @@ const HOST = process.env.HOST || '127.0.0.1';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
 const SEMANTIC_PROMPT = [
-  'You are providing semantic interpretation for a painter critique prototype.',
-  'Do not critique, improve, generate, beautify, or prescribe edits.',
-  'Identify only major scene regions, spatial labels, connected shadow/value families,',
-  'and passages that should be protected during a selective repaint lesson.',
-  'Use concise painter-friendly labels such as distant mountain mass, shoreline darks,',
-  'foreground vegetation band, water-shadow family, or sky opening.',
-  'Return JSON only.'
+  'You are a candid watercolor studio critic inside AI Painter Studio.',
+  'Use painterly visual reasoning, not generic image captioning.',
+  'Critique value structure first, then edge economy, atmosphere, focal hierarchy, and repaintability.',
+  'Favor painterliness over photorealism: shape economy, connected washes, lost-and-found edges,',
+  'atmospheric simplification, and Wesson/Seago-like restraint where relevant.',
+  'Name visible forms concretely: mountain ridge, water band, shoreline dark accents,',
+  'foreground fence shadows, vegetation cluster, cloud opening, reflected water strip, path shadows.',
+  'Be candid and specific. Avoid vague praise, AI-art language, beautification, and global redesign.',
+  'Teach one priority lesson. Defer secondary issues unless they support that lesson.',
+  'Keep the correction selective and repaint-centered. Preserve freshness, light shapes, useful ambiguity,',
+  'and successful washes. Warn against overworking, over-sharpening, or adding detail too soon.',
+  'If object identity is uncertain, say so briefly rather than inventing certainty.',
+  'Return JSON only, in the requested field order. Each field should be concise but painter-useful.'
 ].join(' ');
 
 const SEMANTIC_SCHEMA = {
   type: 'OBJECT',
   properties: {
     sceneSummary: { type: 'STRING' },
-    regions: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          id: { type: 'STRING' },
-          label: { type: 'STRING' },
-          position: { type: 'STRING' }
-        },
-        required: ['id', 'label', 'position']
-      }
-    },
-    valueFamilies: {
-      type: 'ARRAY',
-      items: {
-        type: 'OBJECT',
-        properties: {
-          id: { type: 'STRING' },
-          label: { type: 'STRING' },
-          role: { type: 'STRING' },
-          position: { type: 'STRING' },
-          regionIds: {
-            type: 'ARRAY',
-            items: { type: 'STRING' }
-          }
-        },
-        required: ['id', 'label', 'role', 'position', 'regionIds']
-      }
-    },
-    protectedPassages: {
-      type: 'ARRAY',
-      items: { type: 'STRING' }
-    }
+    priorityDiagnosis: { type: 'STRING' },
+    sceneRead: { type: 'STRING' },
+    valueStructureCritique: { type: 'STRING' },
+    edgeAtmosphereCritique: { type: 'STRING' },
+    interventionScope: { type: 'STRING' },
+    demonstrationDescription: { type: 'STRING' },
+    repaintHandoff: { type: 'STRING' },
+    preserve: { type: 'STRING' },
+    avoid: { type: 'STRING' },
+    uncertaintyNote: { type: 'STRING' }
   },
-  required: ['sceneSummary', 'regions', 'valueFamilies', 'protectedPassages']
+  required: [
+    'priorityDiagnosis',
+    'sceneRead',
+    'valueStructureCritique',
+    'edgeAtmosphereCritique',
+    'interventionScope',
+    'demonstrationDescription',
+    'repaintHandoff',
+    'preserve',
+    'avoid',
+    'uncertaintyNote'
+  ]
 };
 
 const server = http.createServer(async (req, res) => {
@@ -99,6 +93,7 @@ server.listen(PORT, HOST, () => {
 });
 
 async function handleSemantic(req, res) {
+  console.log('APS proxy: semantic request received');
   if (req.method !== 'POST') {
     sendJson(res, 405, { error: 'method_not_allowed' });
     return;
@@ -119,6 +114,7 @@ async function handleSemantic(req, res) {
   }
 
   const semantic = await callGeminiSemanticPass(image, mimeType);
+  console.log('APS proxy: critique object created');
   sendJson(res, 200, semantic);
 }
 
@@ -147,7 +143,7 @@ async function callGeminiSemanticPass(imageBase64, mimeType) {
           response_mime_type: 'application/json',
           response_schema: SEMANTIC_SCHEMA,
           temperature: 0.2,
-          max_output_tokens: 900
+          max_output_tokens: 2400
         }
       })
     }
@@ -168,62 +164,136 @@ async function callGeminiSemanticPass(imageBase64, mimeType) {
     throw new Error('Gemini returned no semantic JSON');
   }
 
-  console.log(`APS proxy: Gemini response preview: ${previewText(text)}`);
-  return normalizeSemanticResponse(parseSemanticJson(text));
+  console.log(`APS proxy: Gemini response received: ${previewText(text)}`);
+  const parsed = parseSemanticJson(text);
+  console.log('APS proxy: parse completed');
+  return normalizeSemanticResponse(parsed);
 }
 
 function normalizeSemanticResponse(raw) {
   const safe = raw && typeof raw === 'object' ? raw : {};
   return {
     source: 'gemini',
-    sceneSummary: stringOr(safe.sceneSummary, 'scene with major value masses'),
+    sceneSummary: cleanText(safe.sceneSummary, ''),
+    priorityDiagnosis: cleanText(safe.priorityDiagnosis, ''),
+    sceneRead: cleanText(safe.sceneRead, ''),
+    valueStructureCritique: cleanText(safe.valueStructureCritique, ''),
+    edgeAtmosphereCritique: cleanText(safe.edgeAtmosphereCritique, ''),
+    interventionScope: cleanText(safe.interventionScope, ''),
+    demonstrationDescription: cleanText(safe.demonstrationDescription, ''),
+    repaintHandoff: cleanText(safe.repaintHandoff, ''),
+    preserve: cleanText(safe.preserve, ''),
+    avoid: cleanText(safe.avoid, ''),
+    uncertaintyNote: cleanText(safe.uncertaintyNote, ''),
     regions: normalizeRegions(safe.regions),
-    valueFamilies: normalizeValueFamilies(safe.valueFamilies),
+    valueFamilies: normalizeValueFamilies(safe.valueFamilies, safe),
+    primaryIssue: cleanText(safe.primaryIssue, ''),
+    critiqueTarget: cleanText(safe.critiqueTarget, ''),
     protectedPassages: normalizeStringArray(safe.protectedPassages, [
       'main light shape',
       'fresh outer washes'
-    ])
+    ]),
+    repaintFirstAction: cleanText(safe.repaintFirstAction, ''),
+    repaintPreserve: normalizeStringArray(safe.repaintPreserve, []),
+    repaintCaution: cleanText(safe.repaintCaution, ''),
+    uncertaintyNotes: normalizeStringArray(safe.uncertaintyNotes, [])
   };
 }
 
 function normalizeRegions(regions) {
   if (!Array.isArray(regions) || regions.length === 0) {
-    return [{ id: 'main_region', label: 'main scene mass', position: 'central field' }];
+    return [];
   }
-  return regions.slice(0, 7).map((region, index) => ({
-    id: stringOr(region.id, `region_${index + 1}`),
-    label: stringOr(region.label, 'scene region'),
-    position: stringOr(region.position, 'within the painting')
-  }));
+  return regions
+    .slice(0, 10)
+    .map((region, index) => normalizeRegion(region, index))
+    .filter(region => region.label);
 }
 
-function normalizeValueFamilies(families) {
-  if (!Array.isArray(families) || families.length === 0) {
-    return [{
-      id: 'target_shadow_family',
-      label: 'connected shadow family',
-      role: 'dominant shadow family',
-      position: 'mid-ground',
-      regionIds: []
-    }];
+function normalizeRegion(region, index) {
+  if (typeof region === 'string') {
+    return {
+      id: `region_${index + 1}`,
+      label: cleanText(region, ''),
+      position: ''
+    };
   }
-  return families.slice(0, 4).map((family, index) => ({
-    id: stringOr(family.id, `value_family_${index + 1}`),
-    label: stringOr(family.label, 'connected shadow family'),
-    role: stringOr(family.role, 'value family'),
-    position: stringOr(family.position, 'within the painting'),
-    regionIds: normalizeStringArray(family.regionIds, [])
-  }));
+
+  const safe = region && typeof region === 'object' ? region : {};
+  return {
+    id: cleanIdentifier(safe.id, `region_${index + 1}`),
+    label: cleanText(
+      safe.label || safe.name || safe.description || safe.sceneForm || safe.form,
+      ''
+    ),
+    position: cleanText(safe.position || safe.location || safe.spatialPosition, '')
+  };
+}
+
+function normalizeValueFamilies(families, semanticRoot) {
+  if (!Array.isArray(families) || families.length === 0) {
+    const critiqueTarget = cleanText(semanticRoot?.critiqueTarget, '');
+    return critiqueTarget
+      ? [{
+        id: 'target_shadow_family',
+        label: critiqueTarget,
+        role: 'dominant value/shadow family',
+        position: '',
+        regionIds: []
+      }]
+      : [];
+  }
+  return families
+    .slice(0, 6)
+    .map((family, index) => normalizeValueFamily(family, index))
+    .filter(family => family.label);
+}
+
+function normalizeValueFamily(family, index) {
+  if (typeof family === 'string') {
+    return {
+      id: `value_family_${index + 1}`,
+      label: cleanText(family, ''),
+      role: '',
+      position: '',
+      regionIds: []
+    };
+  }
+
+  const safe = family && typeof family === 'object' ? family : {};
+  return {
+    id: cleanIdentifier(safe.id, `value_family_${index + 1}`),
+    label: cleanText(
+      safe.label || safe.name || safe.description || safe.valueGroup || safe.shadowFamily,
+      ''
+    ),
+    role: cleanText(safe.role || safe.function || safe.valueRole, ''),
+    position: cleanText(safe.position || safe.location || safe.spatialPosition, ''),
+    regionIds: normalizeStringArray(safe.regionIds, [])
+  };
 }
 
 function normalizeStringArray(value, fallback) {
   return Array.isArray(value) && value.length
-    ? value.map(item => String(item)).filter(Boolean)
+    ? value.map(item => cleanText(item, '')).filter(Boolean)
     : fallback;
 }
 
-function stringOr(value, fallback) {
-  return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+function cleanText(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  const cleaned = String(value)
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s"'-]+|[\s"'-]+$/g, '')
+    .trim();
+  return cleaned || fallback;
+}
+
+function cleanIdentifier(value, fallback) {
+  const cleaned = cleanText(value, fallback)
+    .toLowerCase()
+    .replace(/[^a-z0-9_ -]/g, '')
+    .replace(/\s+/g, '_');
+  return cleaned || fallback;
 }
 
 function parseSemanticJson(text) {
@@ -258,7 +328,22 @@ function parseSemanticJson(text) {
 
 function isSemanticRoot(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
-  return ['sceneSummary', 'regions', 'valueFamilies', 'protectedPassages']
+  return [
+    'priorityDiagnosis',
+    'sceneRead',
+    'valueStructureCritique',
+    'edgeAtmosphereCritique',
+    'interventionScope',
+    'demonstrationDescription',
+    'repaintHandoff',
+    'preserve',
+    'avoid',
+    'uncertaintyNote',
+    'sceneSummary',
+    'regions',
+    'valueFamilies',
+    'protectedPassages'
+  ]
     .some(key => Object.prototype.hasOwnProperty.call(value, key));
 }
 
@@ -335,13 +420,45 @@ function lightCleanupJson(text) {
 
 function recoverSemanticFields(text) {
   const recovered = {};
+  const priorityDiagnosis = recoverStringValue(text, 'priorityDiagnosis');
+  const sceneRead = recoverStringValue(text, 'sceneRead');
+  const valueStructureCritique = recoverStringValue(text, 'valueStructureCritique');
+  const edgeAtmosphereCritique = recoverStringValue(text, 'edgeAtmosphereCritique');
+  const interventionScope = recoverStringValue(text, 'interventionScope');
+  const demonstrationDescription = recoverStringValue(text, 'demonstrationDescription');
+  const repaintHandoff = recoverStringValue(text, 'repaintHandoff');
+  const preserve = recoverStringValue(text, 'preserve');
+  const avoid = recoverStringValue(text, 'avoid');
+  const uncertaintyNote = recoverStringValue(text, 'uncertaintyNote');
   const sceneSummary = recoverStringValue(text, 'sceneSummary');
+  const primaryIssue = recoverStringValue(text, 'primaryIssue');
+  const critiqueTarget = recoverStringValue(text, 'critiqueTarget');
+  const repaintFirstAction = recoverStringValue(text, 'repaintFirstAction');
+  const repaintCaution = recoverStringValue(text, 'repaintCaution');
   const protectedPassages = recoverStringArray(text, 'protectedPassages');
+  const repaintPreserve = recoverStringArray(text, 'repaintPreserve');
+  const uncertaintyNotes = recoverStringArray(text, 'uncertaintyNotes');
   const regions = recoverObjectArray(text, 'regions');
   const valueFamilies = recoverObjectArray(text, 'valueFamilies');
 
+  if (priorityDiagnosis) recovered.priorityDiagnosis = priorityDiagnosis;
+  if (sceneRead) recovered.sceneRead = sceneRead;
+  if (valueStructureCritique) recovered.valueStructureCritique = valueStructureCritique;
+  if (edgeAtmosphereCritique) recovered.edgeAtmosphereCritique = edgeAtmosphereCritique;
+  if (interventionScope) recovered.interventionScope = interventionScope;
+  if (demonstrationDescription) recovered.demonstrationDescription = demonstrationDescription;
+  if (repaintHandoff) recovered.repaintHandoff = repaintHandoff;
+  if (preserve) recovered.preserve = preserve;
+  if (avoid) recovered.avoid = avoid;
+  if (uncertaintyNote) recovered.uncertaintyNote = uncertaintyNote;
   if (sceneSummary) recovered.sceneSummary = sceneSummary;
+  if (primaryIssue) recovered.primaryIssue = primaryIssue;
+  if (critiqueTarget) recovered.critiqueTarget = critiqueTarget;
+  if (repaintFirstAction) recovered.repaintFirstAction = repaintFirstAction;
+  if (repaintCaution) recovered.repaintCaution = repaintCaution;
   if (protectedPassages.length) recovered.protectedPassages = protectedPassages;
+  if (repaintPreserve.length) recovered.repaintPreserve = repaintPreserve;
+  if (uncertaintyNotes.length) recovered.uncertaintyNotes = uncertaintyNotes;
   if (regions.length) recovered.regions = regions;
   if (valueFamilies.length) recovered.valueFamilies = valueFamilies;
 
@@ -356,7 +473,8 @@ function recoverStringValue(text, key) {
   const start = text.indexOf('"', colon + 1);
   if (colon === -1 || start === -1) return '';
 
-  return readQuotedString(text, start).value;
+  const quoted = readQuotedString(text, start);
+  return quoted.closed ? quoted.value : '';
 }
 
 function recoverStringArray(text, key) {

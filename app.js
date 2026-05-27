@@ -34,6 +34,7 @@ const appState = {
     source: 'none',     // none | gemini | fallback
     state: 'unavailable'
   },
+  semanticRequestId: 0,
   critiqueStep: 'idle'  // idle | diagnosis | scope | demo | repaint
 };
 
@@ -48,6 +49,25 @@ const emptyState  = document.getElementById('empty-state');
 const critiquePanel   = document.getElementById('critique-panel');
 const critiqueMessage = document.getElementById('critique-message');
 const semanticSource  = document.getElementById('semantic-source');
+const aiCritiqueSection = document.getElementById('ai-critique-section');
+const aiSceneItem = document.getElementById('ai-scene-item');
+const aiSceneRead = document.getElementById('ai-scene-read');
+const aiValueItem = document.getElementById('ai-value-item');
+const aiValueCritique = document.getElementById('ai-value-critique');
+const aiEdgeItem = document.getElementById('ai-edge-item');
+const aiEdgeCritique = document.getElementById('ai-edge-critique');
+const aiScopeItem = document.getElementById('ai-scope-item');
+const aiScope = document.getElementById('ai-scope');
+const aiDemoItem = document.getElementById('ai-demo-item');
+const aiDemo = document.getElementById('ai-demo');
+const aiRepaintItem = document.getElementById('ai-repaint-item');
+const aiRepaint = document.getElementById('ai-repaint');
+const aiPreserveItem = document.getElementById('ai-preserve-item');
+const aiPreserve = document.getElementById('ai-preserve');
+const aiAvoidItem = document.getElementById('ai-avoid-item');
+const aiAvoid = document.getElementById('ai-avoid');
+const aiUncertaintyItem = document.getElementById('ai-uncertainty-item');
+const aiUncertainty = document.getElementById('ai-uncertainty');
 const semanticSection = document.getElementById('semantic-section');
 const semanticCopy    = document.getElementById('semantic-copy');
 const scopeSection    = document.getElementById('scope-section');
@@ -61,9 +81,14 @@ const nextStepBtn     = document.getElementById('next-step-btn');
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !canvas || !emptyState || !critiquePanel || !critiqueMessage ||
-    !semanticSource || !semanticSection || !semanticCopy || !scopeSection ||
-    !scopeCopy || !demoSection || !demoCopy || !repaintSection ||
-    !repaintList || !nextStepBtn) {
+    !semanticSource || !aiCritiqueSection || !aiSceneItem ||
+    !aiSceneRead || !aiValueItem || !aiValueCritique || !aiEdgeItem ||
+    !aiEdgeCritique || !aiScopeItem || !aiScope || !aiDemoItem ||
+    !aiDemo || !aiRepaintItem || !aiRepaint || !aiPreserveItem ||
+    !aiPreserve || !aiAvoidItem || !aiAvoid || !aiUncertaintyItem ||
+    !aiUncertainty || !semanticSection || !semanticCopy ||
+    !scopeSection || !scopeCopy || !demoSection || !demoCopy ||
+    !repaintSection || !repaintList || !nextStepBtn) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -153,6 +178,8 @@ const DEFAULT_SEMANTIC_INTERPRETATION = {
       regionIds: ['shoreline', 'waterbody']
     }
   ],
+  primaryIssue: '',
+  critiqueTarget: 'shoreline and water-shadow band',
   protectedPassages: ['sky opening', 'main light shape', 'fresh outer washes']
 };
 
@@ -190,12 +217,32 @@ function normalizeSemanticInterpretation(raw, bitmap) {
 
   return {
     source: safe.source || 'gemini',
+    priorityDiagnosis: String(safe.priorityDiagnosis || ''),
+    sceneRead: String(safe.sceneRead || ''),
+    valueStructureCritique: String(safe.valueStructureCritique || ''),
+    edgeAtmosphereCritique: String(safe.edgeAtmosphereCritique || ''),
+    interventionScope: String(safe.interventionScope || ''),
+    demonstrationDescription: String(safe.demonstrationDescription || ''),
+    repaintHandoff: String(safe.repaintHandoff || ''),
+    preserve: String(safe.preserve || ''),
+    avoid: String(safe.avoid || ''),
+    uncertaintyNote: String(safe.uncertaintyNote || ''),
     sceneSummary: String(safe.sceneSummary || fallback.sceneSummary),
     regions,
     valueFamilies,
+    primaryIssue: String(safe.primaryIssue || fallback.primaryIssue || ''),
+    critiqueTarget: String(safe.critiqueTarget || fallback.critiqueTarget || valueFamilies[0].label),
     protectedPassages: Array.isArray(safe.protectedPassages) && safe.protectedPassages.length
       ? safe.protectedPassages.map(String)
-      : fallback.protectedPassages
+      : fallback.protectedPassages,
+    repaintFirstAction: String(safe.repaintFirstAction || fallback.repaintFirstAction || ''),
+    repaintPreserve: Array.isArray(safe.repaintPreserve) && safe.repaintPreserve.length
+      ? safe.repaintPreserve.map(String)
+      : [],
+    repaintCaution: String(safe.repaintCaution || fallback.repaintCaution || ''),
+    uncertaintyNotes: Array.isArray(safe.uncertaintyNotes) && safe.uncertaintyNotes.length
+      ? safe.uncertaintyNotes.map(String)
+      : []
   };
 }
 
@@ -221,13 +268,13 @@ function getFallbackSemanticInterpretation(bitmap) {
   return interpretation;
 }
 
-async function requestSemanticInterpretation(file, bitmap) {
-  console.log('APS: semantic pass start');
+async function requestSemanticInterpretation(file, bitmap, requestId) {
+  console.log(`APS: semantic pass start #${requestId}`);
   const fallback = getFallbackSemanticInterpretation(bitmap);
   const endpoint = getSemanticEndpoint();
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 45000);
 
   try {
     const imageData = await fileToBase64(file);
@@ -245,7 +292,9 @@ async function requestSemanticInterpretation(file, bitmap) {
     });
     if (!response.ok) throw new Error(`semantic endpoint returned ${response.status}`);
     const payload = await response.json();
+    console.log(`APS: Gemini response received #${requestId}`);
     const semantic = normalizeSemanticInterpretation(payload, bitmap);
+    console.log(`APS: critique object created #${requestId}`);
     return {
       semantic,
       status: {
@@ -255,8 +304,8 @@ async function requestSemanticInterpretation(file, bitmap) {
       }
     };
   } catch (err) {
-    console.warn('APS: semantic interpretation fallback used:', err);
-    console.log('APS: semantic pass fallback');
+    console.warn(`APS: semantic interpretation fallback used #${requestId}:`, err);
+    console.log(`APS: semantic pass fallback #${requestId}`);
     return {
       semantic: fallback,
       status: {
@@ -266,7 +315,7 @@ async function requestSemanticInterpretation(file, bitmap) {
       }
     };
   } finally {
-    console.log('APS: semantic pass complete');
+    console.log(`APS: semantic pass complete #${requestId}`);
     window.clearTimeout(timeoutId);
   }
 }
@@ -290,7 +339,10 @@ function getTargetValueFamily() {
 
 function getProtectedPassages() {
   const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
-  return semantic.protectedPassages.join(', ');
+  const passages = semantic.repaintPreserve?.length
+    ? semantic.repaintPreserve
+    : semantic.protectedPassages;
+  return passages.join(', ');
 }
 
 function getRegionReadout() {
@@ -325,18 +377,27 @@ function refreshSemanticSource() {
 }
 
 function refreshCritiqueCopy(step) {
+  if (hasAiNativeCritique()) {
+    refreshAiCritiqueCopy();
+    return;
+  }
+
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
   const family = getTargetValueFamily();
   const protectedPassages = getProtectedPassages();
-  const familyLabel = family.label;
+  const familyLabel = semantic.critiqueTarget || family.label;
   const familyPosition = family.position;
+  const primaryIssue = semantic.primaryIssue || `The dominant shadow structure fragments through the ${familyLabel}, weakening the painting's value cohesion.`;
+  const repaintFirstAction = semantic.repaintFirstAction || `Rebuild the ${familyLabel} as one connected value family.`;
+  const repaintCaution = semantic.repaintCaution || 'Add accents only after the large shadow mass reads clearly.';
 
   scopeCopy.textContent = `${familyLabel}, in the ${familyPosition}. ${protectedPassages} stay untouched.`;
   demoCopy.textContent = `A quiet value grouping pass shows how the ${familyLabel} can behave as one calmer mass.`;
 
   repaintList.replaceChildren(
-    makeListItem(`Rebuild the ${familyLabel} as one connected value family.`),
+    makeListItem(repaintFirstAction),
     makeListItem(`Preserve the ${protectedPassages}.`),
-    makeListItem('Add accents only after the large shadow mass reads clearly.')
+    makeListItem(repaintCaution)
   );
 
   if (step === 'idle') {
@@ -345,7 +406,7 @@ function refreshCritiqueCopy(step) {
       : 'Upload a painting, then run the minimal critique loop.';
     nextStepBtn.textContent = 'Run critique';
   } else if (step === 'diagnosis') {
-    critiqueMessage.textContent = `The dominant shadow structure fragments through the ${familyLabel}, weakening the painting's value cohesion.`;
+    critiqueMessage.textContent = primaryIssue;
     nextStepBtn.textContent = 'Reveal scope';
   } else if (step === 'scope') {
     critiqueMessage.textContent = `One regional intervention is proposed: group the ${familyLabel} while preserving the main light and outer passages.`;
@@ -354,15 +415,62 @@ function refreshCritiqueCopy(step) {
     critiqueMessage.textContent = `The demonstration quietly groups the ${familyPosition} values. It is a study aid, not a finished correction.`;
     nextStepBtn.textContent = 'Repaint guidance';
   } else if (step === 'repaint') {
-    critiqueMessage.textContent = `Return to the painting with one task: rebuild the ${familyLabel} before adding accents.`;
+    critiqueMessage.textContent = `Return to the painting with one task: ${trimTerminalPunctuation(lowercaseFirst(repaintFirstAction))}.`;
     nextStepBtn.textContent = 'Repaint next';
   }
+}
+
+function hasAiNativeCritique() {
+  return appState.semanticStatus.source === 'gemini' &&
+    !!appState.semantic?.priorityDiagnosis;
+}
+
+function refreshAiCritiqueCopy() {
+  const critique = appState.semantic;
+  const family = getTargetValueFamily();
+  const protectedPassages = getProtectedPassages();
+  const target = critique.critiqueTarget || family.label;
+  const sceneRead = critique.sceneRead || critique.sceneSummary || getRegionReadout();
+  const valueCritique = critique.valueStructureCritique || critique.primaryIssue || critique.priorityDiagnosis;
+  const scope = critique.interventionScope ||
+    `${target}, in the ${family.position || 'selected passage'}. ${protectedPassages} stay untouched.`;
+  const demo = critique.demonstrationDescription ||
+    (target ? `A useful demonstration would simplify ${target} without finishing the painting.` : '');
+  const repaint = critique.repaintHandoff || critique.repaintFirstAction;
+  const preserve = critique.preserve || protectedPassages;
+  const avoid = critique.avoid || critique.repaintCaution;
+
+  critiqueMessage.textContent = critique.priorityDiagnosis || critique.primaryIssue || valueCritique;
+  setAiItem(aiSceneItem, aiSceneRead, sceneRead);
+  setAiItem(aiValueItem, aiValueCritique, valueCritique);
+  setAiItem(aiEdgeItem, aiEdgeCritique, critique.edgeAtmosphereCritique);
+  setAiItem(aiScopeItem, aiScope, scope);
+  setAiItem(aiDemoItem, aiDemo, demo);
+  setAiItem(aiRepaintItem, aiRepaint, repaint);
+  setAiItem(aiPreserveItem, aiPreserve, preserve);
+  setAiItem(aiAvoidItem, aiAvoid, avoid);
+  setAiItem(aiUncertaintyItem, aiUncertainty, critique.uncertaintyNote);
+}
+
+function setAiItem(container, copy, text) {
+  const cleaned = String(text || '').trim();
+  copy.textContent = cleaned;
+  container.hidden = !cleaned;
 }
 
 function makeListItem(text) {
   const item = document.createElement('li');
   item.textContent = text;
   return item;
+}
+
+function lowercaseFirst(text) {
+  if (!text) return text;
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+function trimTerminalPunctuation(text) {
+  return String(text || '').replace(/[.!?]\s*$/, '');
 }
 
 /* ── Canvas render ────────────────────────────────────────────────────────── */
@@ -482,11 +590,13 @@ function setCritiqueStep(step) {
   console.log(`APS: critique render trigger: ${step}`);
   appState.critiqueStep = step;
 
-  semanticSection.hidden = !(step === 'diagnosis' || step === 'scope' ||
-                             step === 'demo' || step === 'repaint');
-  scopeSection.hidden = !(step === 'scope' || step === 'demo' || step === 'repaint');
-  demoSection.hidden = !(step === 'demo' || step === 'repaint');
-  repaintSection.hidden = (step !== 'repaint');
+  const useAiCritique = hasAiNativeCritique();
+  aiCritiqueSection.hidden = !useAiCritique;
+  semanticSection.hidden = useAiCritique || !(step === 'diagnosis' || step === 'scope' ||
+                                              step === 'demo' || step === 'repaint');
+  scopeSection.hidden = useAiCritique || !(step === 'scope' || step === 'demo' || step === 'repaint');
+  demoSection.hidden = useAiCritique || !(step === 'demo' || step === 'repaint');
+  repaintSection.hidden = useAiCritique || (step !== 'repaint');
 
   critiquePanel.dataset.step = step;
 
@@ -494,11 +604,13 @@ function setCritiqueStep(step) {
   refreshSemanticSource();
   refreshCritiqueCopy(step);
 
+  nextStepBtn.hidden = useAiCritique;
   nextStepBtn.disabled = !appState.image.bitmap || step === 'repaint';
 
   if (appState.image.bitmap) {
     renderCanvas(appState.image.bitmap);
   }
+  console.log(`APS: critique render complete: ${step}${useAiCritique ? ' (Gemini)' : ' (fallback)'}`);
 }
 
 function advanceCritiqueLoop() {
@@ -526,6 +638,8 @@ fileInput.addEventListener('change', async () => {
   console.log('APS: upload event fired');
   const file = fileInput.files[0];
   if (!file) return;
+  const requestId = appState.semanticRequestId + 1;
+  appState.semanticRequestId = requestId;
 
   // Revoke any previous ObjectURL to free memory
   if (appState.image.srcUrl) {
@@ -537,6 +651,13 @@ fileInput.addEventListener('change', async () => {
 
   try {
     const bitmap = await createImageBitmap(file);
+    if (requestId !== appState.semanticRequestId) {
+      bitmap.close();
+      URL.revokeObjectURL(url);
+      fileInput.value = '';
+      console.log(`APS: stale upload ignored #${requestId}`);
+      return;
+    }
 
     appState.image.bitmap   = bitmap;
     appState.image.srcUrl   = url;
@@ -547,14 +668,19 @@ fileInput.addEventListener('change', async () => {
 
     showCanvas();
     renderCanvas(bitmap);
-    console.log('APS: upload complete');
+    console.log(`APS: upload complete #${requestId}`);
 
-    const semanticResult = await requestSemanticInterpretation(file, bitmap);
+    const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
+    if (requestId !== appState.semanticRequestId || bitmap !== appState.image.bitmap) {
+      console.log(`APS: stale semantic result ignored #${requestId}`);
+      fileInput.value = '';
+      return;
+    }
     appState.semantic = semanticResult.semantic;
     appState.semanticStatus = semanticResult.status;
 
+    console.log(`APS: critique render trigger from semantic completion #${requestId}`);
     setCritiqueStep('diagnosis');
-    renderCanvas(bitmap);
 
   } catch (err) {
     console.error('APS: failed to decode image:', err);
@@ -562,6 +688,7 @@ fileInput.addEventListener('change', async () => {
     appState.image = { bitmap: null, srcUrl: null, filename: null };
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
+    appState.semanticRequestId += 1;
     appState.critiqueStep = 'idle';
     showEmptyState();
   }
@@ -582,6 +709,7 @@ resetBtn.addEventListener('click', () => {
   appState.image = { bitmap: null, srcUrl: null, filename: null };
   appState.semantic = null;
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
+  appState.semanticRequestId += 1;
   appState.critiqueStep = 'idle';
   showEmptyState();
 });
