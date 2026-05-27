@@ -4,8 +4,8 @@
 
 AI Painter Studio uses two lightweight local processes during development:
 
-- the static frontend server,
-- and the Gemini semantic proxy.
+- the static frontend server
+- the Gemini semantic proxy
 
 Keeping these roles separate prevents confusion between serving app files and handling `POST /api/semantic`.
 
@@ -25,6 +25,8 @@ http://127.0.0.1:8080/api/semantic
 ```
 
 when it is served from `127.0.0.1:8081` or `localhost:8081`.
+
+Both frontend hostnames use the same proxy target, `127.0.0.1:8080`, to keep local API routing explicit.
 
 In same-origin contexts, such as when the semantic proxy itself serves the frontend, the app falls back to:
 
