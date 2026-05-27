@@ -57,10 +57,19 @@
       </section>
 
       <aside class="critique-panel" id="critique-panel" aria-live="polite">
+        <label class="mode-control" for="workflow-mode">
+          <span class="section-label">Workflow</span>
+          <select id="workflow-mode" class="mode-select">
+            <option value="reference-ideation">Reference Ideation</option>
+            <option value="in-progress-guidance">In-Progress Guidance</option>
+            <option value="finished-review">Finished Review</option>
+          </select>
+        </label>
+
         <p class="panel-kicker">Value structure</p>
         <h2 class="panel-title">One visual lesson</h2>
         <p class="panel-copy" id="critique-message">
-          Upload a painting, then run the minimal critique loop.
+          Upload a reference photograph to explore painterly possibilities.
         </p>
 
         <p class="semantic-source" id="semantic-source" hidden>

@@ -21,6 +21,12 @@ const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '127.0.0.1';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 
+const WORKFLOW_MODES = {
+  REFERENCE_IDEATION: 'reference-ideation',
+  IN_PROGRESS_GUIDANCE: 'in-progress-guidance',
+  FINISHED_REVIEW: 'finished-review'
+};
+
 const SEMANTIC_PROMPT = [
   'You are a candid watercolor studio critic inside AI Painter Studio.',
   'Use painterly visual reasoning, not generic image captioning.',
@@ -66,6 +72,54 @@ const SEMANTIC_SCHEMA = {
   ]
 };
 
+const REFERENCE_IDEATION_PROMPT = [
+  'You are a painterly composition mentor inside AI Painter Studio.',
+  'This is Reference Ideation Mode. The input is a reference photograph before painting begins.',
+  'Do not critique, score, rescue, repair, or give repaint guidance. Do not caption the image.',
+  'Treat the photograph as raw painting material, not as a finished work and not as a failed painting.',
+  'Help the painter discover possible interpretations: compositional simplification, dominant value masses,',
+  'atmospheric opportunities, focal hierarchy, painterly abstraction, Wesson-esque simplification,',
+  'palette direction, crop/composition ideas, mood possibilities, what to suppress, and what to emphasize.',
+  'Favor value-first organization, edge economy, atmospheric simplification, painterly restraint,',
+  'and painterliness over photorealism. Encourage multiple valid possibilities without sounding vague.',
+  'Avoid judgmental language, ratings, defect lists, repair language, and AI-art beautification language.',
+  'Return JSON only, in the requested field order. Each field should be concise but idea-rich.'
+].join(' ');
+
+const REFERENCE_IDEATION_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    sceneSummary: { type: 'STRING' },
+    dominantRead: { type: 'STRING' },
+    valueMasses: { type: 'STRING' },
+    atmosphereOpportunities: { type: 'STRING' },
+    focalHierarchy: { type: 'STRING' },
+    simplificationIdea: { type: 'STRING' },
+    paletteDirection: { type: 'STRING' },
+    cropIdeas: { type: 'STRING' },
+    moodPossibilities: { type: 'STRING' },
+    suppress: { type: 'STRING' },
+    emphasize: { type: 'STRING' },
+    abstractionOpportunities: { type: 'STRING' },
+    uncertaintyNote: { type: 'STRING' }
+  },
+  required: [
+    'sceneSummary',
+    'dominantRead',
+    'valueMasses',
+    'atmosphereOpportunities',
+    'focalHierarchy',
+    'simplificationIdea',
+    'paletteDirection',
+    'cropIdeas',
+    'moodPossibilities',
+    'suppress',
+    'emphasize',
+    'abstractionOpportunities',
+    'uncertaintyNote'
+  ]
+};
+
 const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -107,18 +161,23 @@ async function handleSemantic(req, res) {
   const body = await readJsonBody(req);
   const image = typeof body.image === 'string' ? body.image.trim() : '';
   const mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
+  const workflowMode = normalizeWorkflowMode(body.workflowMode);
 
   if (!image || !['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
     sendJson(res, 400, { error: 'invalid_image' });
     return;
   }
 
-  const semantic = await callGeminiSemanticPass(image, mimeType);
-  console.log('APS proxy: critique object created');
+  const semantic = await callGeminiSemanticPass(image, mimeType, workflowMode);
+  console.log(`APS proxy: ${workflowMode} object created`);
   sendJson(res, 200, semantic);
 }
 
-async function callGeminiSemanticPass(imageBase64, mimeType) {
+async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
+  const prompt = promptForWorkflow(workflowMode);
+  const schema = schemaForWorkflow(workflowMode);
+  const temperature = workflowMode === WORKFLOW_MODES.REFERENCE_IDEATION ? 0.45 : 0.2;
+
   const response = await fetch(
     `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
     {
@@ -136,13 +195,13 @@ async function callGeminiSemanticPass(imageBase64, mimeType) {
                 data: imageBase64
               }
             },
-            { text: SEMANTIC_PROMPT }
+            { text: prompt }
           ]
         }],
         generationConfig: {
           response_mime_type: 'application/json',
-          response_schema: SEMANTIC_SCHEMA,
-          temperature: 0.2,
+          response_schema: schema,
+          temperature,
           max_output_tokens: 2400
         }
       })
@@ -167,13 +226,14 @@ async function callGeminiSemanticPass(imageBase64, mimeType) {
   console.log(`APS proxy: Gemini response received: ${previewText(text)}`);
   const parsed = parseSemanticJson(text);
   console.log('APS proxy: parse completed');
-  return normalizeSemanticResponse(parsed);
+  return normalizeSemanticResponse(parsed, workflowMode);
 }
 
-function normalizeSemanticResponse(raw) {
+function normalizeSemanticResponse(raw, workflowMode = WORKFLOW_MODES.IN_PROGRESS_GUIDANCE) {
   const safe = raw && typeof raw === 'object' ? raw : {};
   return {
     source: 'gemini',
+    workflowMode,
     sceneSummary: cleanText(safe.sceneSummary, ''),
     priorityDiagnosis: cleanText(safe.priorityDiagnosis, ''),
     sceneRead: cleanText(safe.sceneRead, ''),
@@ -196,8 +256,39 @@ function normalizeSemanticResponse(raw) {
     repaintFirstAction: cleanText(safe.repaintFirstAction, ''),
     repaintPreserve: normalizeStringArray(safe.repaintPreserve, []),
     repaintCaution: cleanText(safe.repaintCaution, ''),
-    uncertaintyNotes: normalizeStringArray(safe.uncertaintyNotes, [])
+    uncertaintyNotes: normalizeStringArray(safe.uncertaintyNotes, []),
+    dominantRead: cleanText(safe.dominantRead, ''),
+    valueMasses: cleanText(safe.valueMasses, ''),
+    atmosphereOpportunities: cleanText(safe.atmosphereOpportunities, ''),
+    focalHierarchy: cleanText(safe.focalHierarchy, ''),
+    simplificationIdea: cleanText(safe.simplificationIdea, ''),
+    paletteDirection: cleanText(safe.paletteDirection, ''),
+    cropIdeas: cleanText(safe.cropIdeas, ''),
+    moodPossibilities: cleanText(safe.moodPossibilities, ''),
+    suppress: cleanText(safe.suppress, ''),
+    emphasize: cleanText(safe.emphasize, ''),
+    abstractionOpportunities: cleanText(safe.abstractionOpportunities, '')
   };
+}
+
+function normalizeWorkflowMode(value) {
+  return Object.values(WORKFLOW_MODES).includes(value)
+    ? value
+    : WORKFLOW_MODES.IN_PROGRESS_GUIDANCE;
+}
+
+function promptForWorkflow(workflowMode) {
+  if (workflowMode === WORKFLOW_MODES.REFERENCE_IDEATION) {
+    return REFERENCE_IDEATION_PROMPT;
+  }
+  return SEMANTIC_PROMPT;
+}
+
+function schemaForWorkflow(workflowMode) {
+  if (workflowMode === WORKFLOW_MODES.REFERENCE_IDEATION) {
+    return REFERENCE_IDEATION_SCHEMA;
+  }
+  return SEMANTIC_SCHEMA;
 }
 
 function normalizeRegions(regions) {
@@ -340,6 +431,17 @@ function isSemanticRoot(value) {
     'avoid',
     'uncertaintyNote',
     'sceneSummary',
+    'dominantRead',
+    'valueMasses',
+    'atmosphereOpportunities',
+    'focalHierarchy',
+    'simplificationIdea',
+    'paletteDirection',
+    'cropIdeas',
+    'moodPossibilities',
+    'suppress',
+    'emphasize',
+    'abstractionOpportunities',
     'regions',
     'valueFamilies',
     'protectedPassages'
@@ -438,6 +540,17 @@ function recoverSemanticFields(text) {
   const protectedPassages = recoverStringArray(text, 'protectedPassages');
   const repaintPreserve = recoverStringArray(text, 'repaintPreserve');
   const uncertaintyNotes = recoverStringArray(text, 'uncertaintyNotes');
+  const dominantRead = recoverStringValue(text, 'dominantRead');
+  const valueMasses = recoverStringValue(text, 'valueMasses');
+  const atmosphereOpportunities = recoverStringValue(text, 'atmosphereOpportunities');
+  const focalHierarchy = recoverStringValue(text, 'focalHierarchy');
+  const simplificationIdea = recoverStringValue(text, 'simplificationIdea');
+  const paletteDirection = recoverStringValue(text, 'paletteDirection');
+  const cropIdeas = recoverStringValue(text, 'cropIdeas');
+  const moodPossibilities = recoverStringValue(text, 'moodPossibilities');
+  const suppress = recoverStringValue(text, 'suppress');
+  const emphasize = recoverStringValue(text, 'emphasize');
+  const abstractionOpportunities = recoverStringValue(text, 'abstractionOpportunities');
   const regions = recoverObjectArray(text, 'regions');
   const valueFamilies = recoverObjectArray(text, 'valueFamilies');
 
@@ -459,6 +572,17 @@ function recoverSemanticFields(text) {
   if (protectedPassages.length) recovered.protectedPassages = protectedPassages;
   if (repaintPreserve.length) recovered.repaintPreserve = repaintPreserve;
   if (uncertaintyNotes.length) recovered.uncertaintyNotes = uncertaintyNotes;
+  if (dominantRead) recovered.dominantRead = dominantRead;
+  if (valueMasses) recovered.valueMasses = valueMasses;
+  if (atmosphereOpportunities) recovered.atmosphereOpportunities = atmosphereOpportunities;
+  if (focalHierarchy) recovered.focalHierarchy = focalHierarchy;
+  if (simplificationIdea) recovered.simplificationIdea = simplificationIdea;
+  if (paletteDirection) recovered.paletteDirection = paletteDirection;
+  if (cropIdeas) recovered.cropIdeas = cropIdeas;
+  if (moodPossibilities) recovered.moodPossibilities = moodPossibilities;
+  if (suppress) recovered.suppress = suppress;
+  if (emphasize) recovered.emphasize = emphasize;
+  if (abstractionOpportunities) recovered.abstractionOpportunities = abstractionOpportunities;
   if (regions.length) recovered.regions = regions;
   if (valueFamilies.length) recovered.valueFamilies = valueFamilies;
 

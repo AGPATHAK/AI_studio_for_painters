@@ -27,8 +27,10 @@ const appState = {
   image: {
     bitmap:   null,   // ImageBitmap | null
     srcUrl:   null,   // ObjectURL string | null
-    filename: null    // original filename | null
+    filename: null,   // original filename | null
+    file:     null    // original File object | null, retained only for mode reruns
   },
+  workflowMode: 'reference-ideation',
   semantic: null,       // narrowly scoped scene labels and value-family hints
   semanticStatus: {
     source: 'none',     // none | gemini | fallback
@@ -44,9 +46,12 @@ const uploadBtn   = document.getElementById('upload-btn');
 const resetBtn    = document.getElementById('reset-btn');
 const critiqueBtn = document.getElementById('critique-btn');
 const themeBtn    = document.getElementById('theme-btn');
+const workflowModeSelect = document.getElementById('workflow-mode');
 const canvas      = document.getElementById('main-canvas');
 const emptyState  = document.getElementById('empty-state');
 const critiquePanel   = document.getElementById('critique-panel');
+const panelKicker = critiquePanel?.querySelector('.panel-kicker');
+const panelTitle = critiquePanel?.querySelector('.panel-title');
 const critiqueMessage = document.getElementById('critique-message');
 const semanticSource  = document.getElementById('semantic-source');
 const aiCritiqueSection = document.getElementById('ai-critique-section');
@@ -80,7 +85,9 @@ const nextStepBtn     = document.getElementById('next-step-btn');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
-    !canvas || !emptyState || !critiquePanel || !critiqueMessage ||
+    !workflowModeSelect ||
+    !canvas || !emptyState || !critiquePanel || !panelKicker ||
+    !panelTitle || !critiqueMessage ||
     !semanticSource || !aiCritiqueSection || !aiSceneItem ||
     !aiSceneRead || !aiValueItem || !aiValueCritique || !aiEdgeItem ||
     !aiEdgeCritique || !aiScopeItem || !aiScope || !aiDemoItem ||
@@ -93,6 +100,45 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
 }
 
 const ctx = canvas.getContext('2d');
+
+const WORKFLOW_MODES = {
+  REFERENCE_IDEATION: 'reference-ideation',
+  IN_PROGRESS_GUIDANCE: 'in-progress-guidance',
+  FINISHED_REVIEW: 'finished-review'
+};
+
+const WORKFLOW_COPY = {
+  [WORKFLOW_MODES.REFERENCE_IDEATION]: {
+    kicker: 'Reference ideation',
+    title: 'Painterly possibilities',
+    empty: 'Upload a reference photograph to explore painterly possibilities.',
+    ready: 'Reference structure is ready. Run ideation when you want painterly directions.',
+    action: 'Run ideation',
+    sourceReady: 'Semantic source: Gemini Vision - ideation pass succeeded',
+    sourceFallback: 'Semantic source: Local fallback interpretation - ideation fallback used',
+    sourceUnavailable: 'Semantic source: Local fallback interpretation - ideation unavailable'
+  },
+  [WORKFLOW_MODES.IN_PROGRESS_GUIDANCE]: {
+    kicker: 'In-progress guidance',
+    title: 'One visual lesson',
+    empty: 'Upload a painting, then run the minimal critique loop.',
+    ready: 'Scene structure is labeled. Run the minimal critique loop when ready.',
+    action: 'Run critique',
+    sourceReady: 'Semantic source: Gemini Vision - guidance pass succeeded',
+    sourceFallback: 'Semantic source: Local fallback interpretation - guidance fallback used',
+    sourceUnavailable: 'Semantic source: Local fallback interpretation - guidance unavailable'
+  },
+  [WORKFLOW_MODES.FINISHED_REVIEW]: {
+    kicker: 'Finished review',
+    title: 'Reflective review',
+    empty: 'Upload a finished painting for a lightweight review placeholder.',
+    ready: 'Finished Review uses the current guidance behavior for now.',
+    action: 'Run review',
+    sourceReady: 'Semantic source: Gemini Vision - review placeholder used guidance pass',
+    sourceFallback: 'Semantic source: Local fallback interpretation - review fallback used',
+    sourceUnavailable: 'Semantic source: Local fallback interpretation - review unavailable'
+  }
+};
 
 /* ── Theme ────────────────────────────────────────────────────────────────── */
 
@@ -180,7 +226,18 @@ const DEFAULT_SEMANTIC_INTERPRETATION = {
   ],
   primaryIssue: '',
   critiqueTarget: 'shoreline and water-shadow band',
-  protectedPassages: ['sky opening', 'main light shape', 'fresh outer washes']
+  protectedPassages: ['sky opening', 'main light shape', 'fresh outer washes'],
+  dominantRead: 'A broad light field, a middle value band, and a darker foreground can become the painting\'s main structure.',
+  valueMasses: 'Group the scene into three or four large value families before considering detail.',
+  atmosphereOpportunities: 'Let distance soften, merge small shapes, and keep edges quiet outside the focal passage.',
+  focalHierarchy: 'Choose one dominant contrast area and let surrounding passages support it.',
+  simplificationIdea: 'Use Wesson-like restraint: fewer shapes, broader washes, and accents saved for the final read.',
+  paletteDirection: 'Start with a restrained warm/cool relationship instead of chasing local color.',
+  cropIdeas: 'Test a tighter crop that removes weak margins and gives the main light/dark relationship more authority.',
+  moodPossibilities: 'Consider calm atmospheric understatement before pushing drama.',
+  suppress: 'Suppress incidental detail, equal contrast, and hard edges outside the main idea.',
+  emphasize: 'Emphasize the largest value relationship, the cleanest silhouette, and one focal transition.',
+  abstractionOpportunities: 'Translate repeated small forms into linked shapes and broken-edge passages.'
 };
 
 const SEMANTIC_INTERPRETATION_PROMPT = [
@@ -192,6 +249,20 @@ const SEMANTIC_INTERPRETATION_PROMPT = [
 
 function getSemanticEndpoint() {
   return localStorage.getItem('aps:semanticEndpoint') || '/api/semantic';
+}
+
+function getWorkflowMode() {
+  return Object.values(WORKFLOW_MODES).includes(appState.workflowMode)
+    ? appState.workflowMode
+    : WORKFLOW_MODES.REFERENCE_IDEATION;
+}
+
+function isReferenceIdeationMode() {
+  return getWorkflowMode() === WORKFLOW_MODES.REFERENCE_IDEATION;
+}
+
+function getWorkflowCopy() {
+  return WORKFLOW_COPY[getWorkflowMode()] || WORKFLOW_COPY[WORKFLOW_MODES.REFERENCE_IDEATION];
 }
 
 function normalizeSemanticInterpretation(raw, bitmap) {
@@ -227,6 +298,17 @@ function normalizeSemanticInterpretation(raw, bitmap) {
     preserve: String(safe.preserve || ''),
     avoid: String(safe.avoid || ''),
     uncertaintyNote: String(safe.uncertaintyNote || ''),
+    dominantRead: String(safe.dominantRead || fallback.dominantRead || safe.sceneRead || safe.sceneSummary || ''),
+    valueMasses: String(safe.valueMasses || fallback.valueMasses || safe.valueStructureCritique || ''),
+    atmosphereOpportunities: String(safe.atmosphereOpportunities || fallback.atmosphereOpportunities || safe.edgeAtmosphereCritique || ''),
+    focalHierarchy: String(safe.focalHierarchy || fallback.focalHierarchy || ''),
+    simplificationIdea: String(safe.simplificationIdea || fallback.simplificationIdea || safe.demonstrationDescription || ''),
+    paletteDirection: String(safe.paletteDirection || fallback.paletteDirection || ''),
+    cropIdeas: String(safe.cropIdeas || fallback.cropIdeas || ''),
+    moodPossibilities: String(safe.moodPossibilities || fallback.moodPossibilities || ''),
+    suppress: String(safe.suppress || fallback.suppress || safe.avoid || ''),
+    emphasize: String(safe.emphasize || fallback.emphasize || safe.preserve || ''),
+    abstractionOpportunities: String(safe.abstractionOpportunities || fallback.abstractionOpportunities || ''),
     sceneSummary: String(safe.sceneSummary || fallback.sceneSummary),
     regions,
     valueFamilies,
@@ -272,6 +354,7 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
   console.log(`APS: semantic pass start #${requestId}`);
   const fallback = getFallbackSemanticInterpretation(bitmap);
   const endpoint = getSemanticEndpoint();
+  const workflowMode = getWorkflowMode();
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 45000);
@@ -285,6 +368,7 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
         image: imageData,
         mimeType: file.type,
         filename: file.name,
+        workflowMode,
         purpose: 'scene_regions_and_value_families_only',
         prompt: SEMANTIC_INTERPRETATION_PROMPT
       }),
@@ -363,20 +447,27 @@ function refreshSemanticCopy() {
 
 function refreshSemanticSource() {
   const status = appState.semanticStatus;
+  const copy = getWorkflowCopy();
   semanticSource.hidden = (status.source === 'none');
 
   if (status.source === 'gemini') {
-    semanticSource.textContent = 'Semantic source: Gemini Vision - semantic pass succeeded';
+    semanticSource.textContent = copy.sourceReady;
   } else if (status.state === 'unavailable') {
-    semanticSource.textContent = 'Semantic source: Local fallback interpretation - semantic unavailable';
+    semanticSource.textContent = copy.sourceUnavailable;
   } else if (status.source === 'fallback') {
-    semanticSource.textContent = 'Semantic source: Local fallback interpretation - semantic fallback used';
+    semanticSource.textContent = copy.sourceFallback;
   } else {
     semanticSource.textContent = 'Semantic source: waiting for image';
   }
 }
 
 function refreshCritiqueCopy(step) {
+  refreshWorkflowChrome();
+  if (isReferenceIdeationMode()) {
+    refreshReferenceIdeationCopy(step);
+    return;
+  }
+
   if (hasAiNativeCritique()) {
     refreshAiCritiqueCopy();
     return;
@@ -401,10 +492,11 @@ function refreshCritiqueCopy(step) {
   );
 
   if (step === 'idle') {
+    const copy = getWorkflowCopy();
     critiqueMessage.textContent = appState.image.bitmap
-      ? 'Scene structure is labeled. Run the minimal critique loop when ready.'
-      : 'Upload a painting, then run the minimal critique loop.';
-    nextStepBtn.textContent = 'Run critique';
+      ? copy.ready
+      : copy.empty;
+    nextStepBtn.textContent = copy.action;
   } else if (step === 'diagnosis') {
     critiqueMessage.textContent = primaryIssue;
     nextStepBtn.textContent = 'Reveal scope';
@@ -418,6 +510,70 @@ function refreshCritiqueCopy(step) {
     critiqueMessage.textContent = `Return to the painting with one task: ${trimTerminalPunctuation(lowercaseFirst(repaintFirstAction))}.`;
     nextStepBtn.textContent = 'Repaint next';
   }
+}
+
+function refreshWorkflowChrome() {
+  const copy = getWorkflowCopy();
+  critiquePanel.dataset.workflow = getWorkflowMode();
+  panelKicker.textContent = copy.kicker;
+  panelTitle.textContent = copy.title;
+  critiqueBtn.textContent = isReferenceIdeationMode() ? 'Idea' : 'Crit';
+}
+
+function refreshReferenceIdeationCopy(step) {
+  if (!appState.image.bitmap) {
+    critiqueMessage.textContent = getWorkflowCopy().empty;
+    aiCritiqueSection.hidden = true;
+    nextStepBtn.hidden = true;
+    return;
+  }
+
+  const ideation = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  const hasGeminiIdeation = appState.semanticStatus.source === 'gemini';
+  const dominantRead = ideation.dominantRead || ideation.sceneRead || ideation.sceneSummary;
+  const valueMasses = ideation.valueMasses || ideation.valueStructureCritique;
+  const atmosphere = ideation.atmosphereOpportunities || ideation.edgeAtmosphereCritique;
+  const compositionIdeas = [
+    ideation.cropIdeas,
+    ideation.focalHierarchy
+  ].filter(Boolean).join(' ');
+  const simplification = [
+    ideation.simplificationIdea,
+    ideation.abstractionOpportunities
+  ].filter(Boolean).join(' ');
+  const paletteMood = [
+    ideation.paletteDirection,
+    ideation.moodPossibilities
+  ].filter(Boolean).join(' ');
+
+  critiqueMessage.textContent = appState.image.bitmap
+    ? (hasGeminiIdeation
+      ? 'The reference is being treated as raw painting material, not as a work to critique.'
+      : getWorkflowCopy().ready)
+    : getWorkflowCopy().empty;
+
+  aiCritiqueSection.hidden = false;
+  setAiLabel(aiSceneItem, 'Dominant read');
+  setAiLabel(aiValueItem, 'Dominant value masses');
+  setAiLabel(aiEdgeItem, 'Atmosphere and edge economy');
+  setAiLabel(aiScopeItem, 'Crop / composition ideas');
+  setAiLabel(aiDemoItem, 'Wesson-esque simplification');
+  setAiLabel(aiRepaintItem, 'Palette / mood direction');
+  setAiLabel(aiPreserveItem, 'Emphasize');
+  setAiLabel(aiAvoidItem, 'Suppress');
+  setAiLabel(aiUncertaintyItem, 'Uncertainty');
+
+  setAiItem(aiSceneItem, aiSceneRead, dominantRead);
+  setAiItem(aiValueItem, aiValueCritique, valueMasses);
+  setAiItem(aiEdgeItem, aiEdgeCritique, atmosphere);
+  setAiItem(aiScopeItem, aiScope, compositionIdeas);
+  setAiItem(aiDemoItem, aiDemo, simplification);
+  setAiItem(aiRepaintItem, aiRepaint, paletteMood);
+  setAiItem(aiPreserveItem, aiPreserve, ideation.emphasize || ideation.preserve);
+  setAiItem(aiAvoidItem, aiAvoid, ideation.suppress || ideation.avoid);
+  setAiItem(aiUncertaintyItem, aiUncertainty, ideation.uncertaintyNote);
+
+  nextStepBtn.hidden = true;
 }
 
 function hasAiNativeCritique() {
@@ -440,6 +596,16 @@ function refreshAiCritiqueCopy() {
   const preserve = critique.preserve || protectedPassages;
   const avoid = critique.avoid || critique.repaintCaution;
 
+  setAiLabel(aiSceneItem, 'Scene read');
+  setAiLabel(aiValueItem, 'Value structure');
+  setAiLabel(aiEdgeItem, 'Edges and atmosphere');
+  setAiLabel(aiScopeItem, 'Scope');
+  setAiLabel(aiDemoItem, 'Demonstration');
+  setAiLabel(aiRepaintItem, 'Repaint handoff');
+  setAiLabel(aiPreserveItem, 'Preserve');
+  setAiLabel(aiAvoidItem, 'Avoid');
+  setAiLabel(aiUncertaintyItem, 'Uncertainty');
+
   critiqueMessage.textContent = critique.priorityDiagnosis || critique.primaryIssue || valueCritique;
   setAiItem(aiSceneItem, aiSceneRead, sceneRead);
   setAiItem(aiValueItem, aiValueCritique, valueCritique);
@@ -450,6 +616,11 @@ function refreshAiCritiqueCopy() {
   setAiItem(aiPreserveItem, aiPreserve, preserve);
   setAiItem(aiAvoidItem, aiAvoid, avoid);
   setAiItem(aiUncertaintyItem, aiUncertainty, critique.uncertaintyNote);
+}
+
+function setAiLabel(container, text) {
+  const label = container.querySelector('.section-label');
+  if (label) label.textContent = text;
 }
 
 function setAiItem(container, copy, text) {
@@ -590,7 +761,7 @@ function setCritiqueStep(step) {
   console.log(`APS: critique render trigger: ${step}`);
   appState.critiqueStep = step;
 
-  const useAiCritique = hasAiNativeCritique();
+  const useAiCritique = isReferenceIdeationMode() || hasAiNativeCritique();
   aiCritiqueSection.hidden = !useAiCritique;
   semanticSection.hidden = useAiCritique || !(step === 'diagnosis' || step === 'scope' ||
                                               step === 'demo' || step === 'repaint');
@@ -625,6 +796,32 @@ function advanceCritiqueLoop() {
   } else if (appState.critiqueStep === 'demo') {
     setCritiqueStep('repaint');
   }
+}
+
+async function rerunWorkflowAnalysis() {
+  if (!appState.image.bitmap || !appState.image.file) {
+    setCritiqueStep(appState.image.bitmap ? 'diagnosis' : 'idle');
+    return;
+  }
+
+  const requestId = appState.semanticRequestId + 1;
+  const bitmap = appState.image.bitmap;
+  const file = appState.image.file;
+  appState.semanticRequestId = requestId;
+  appState.semantic = null;
+  appState.semanticStatus = { source: 'none', state: 'unavailable' };
+  appState.critiqueStep = 'idle';
+  setCritiqueStep('idle');
+
+  const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
+  if (requestId !== appState.semanticRequestId || bitmap !== appState.image.bitmap) {
+    console.log(`APS: stale workflow result ignored #${requestId}`);
+    return;
+  }
+
+  appState.semantic = semanticResult.semantic;
+  appState.semanticStatus = semanticResult.status;
+  setCritiqueStep('diagnosis');
 }
 
 /* ── File upload ──────────────────────────────────────────────────────────── */
@@ -662,6 +859,7 @@ fileInput.addEventListener('change', async () => {
     appState.image.bitmap   = bitmap;
     appState.image.srcUrl   = url;
     appState.image.filename = file.name;
+    appState.image.file     = file;
     appState.semantic       = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.critiqueStep   = 'idle';
@@ -685,7 +883,7 @@ fileInput.addEventListener('change', async () => {
   } catch (err) {
     console.error('APS: failed to decode image:', err);
     URL.revokeObjectURL(url);
-    appState.image = { bitmap: null, srcUrl: null, filename: null };
+    appState.image = { bitmap: null, srcUrl: null, filename: null, file: null };
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.semanticRequestId += 1;
@@ -706,7 +904,7 @@ resetBtn.addEventListener('click', () => {
   if (appState.image.srcUrl) {
     URL.revokeObjectURL(appState.image.srcUrl);
   }
-  appState.image = { bitmap: null, srcUrl: null, filename: null };
+  appState.image = { bitmap: null, srcUrl: null, filename: null, file: null };
   appState.semantic = null;
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.semanticRequestId += 1;
@@ -716,10 +914,15 @@ resetBtn.addEventListener('click', () => {
 
 critiqueBtn.addEventListener('click', () => {
   if (!appState.image.bitmap) return;
-  setCritiqueStep('diagnosis');
+  rerunWorkflowAnalysis();
 });
 
 nextStepBtn.addEventListener('click', advanceCritiqueLoop);
+
+workflowModeSelect.addEventListener('change', () => {
+  appState.workflowMode = workflowModeSelect.value;
+  rerunWorkflowAnalysis();
+});
 
 /* ── Resize re-fit ────────────────────────────────────────────────────────── */
 
@@ -737,4 +940,5 @@ window.addEventListener('resize', () => {
 /* ── Initialise ───────────────────────────────────────────────────────────── */
 
 initTheme();
+workflowModeSelect.value = getWorkflowMode();
 showEmptyState();
