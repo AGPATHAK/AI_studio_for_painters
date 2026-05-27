@@ -38,3 +38,4 @@ scratch/
 # Reviewer packs / external bundles (per SOP §14)
 reviewer-pack/
 *.reviewer.zip
+.semantic-proxy.log
