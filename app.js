@@ -36,6 +36,12 @@ const appState = {
     source: 'none',     // none | gemini | fallback
     state: 'unavailable'
   },
+  mockup: {
+    status: 'idle',      // idle | loading | succeeded | failed
+    imageDataUrl: '',
+    notes: '',
+    error: ''
+  },
   semanticRequestId: 0,
   critiqueStep: 'idle'  // idle | diagnosis | scope | demo | repaint
 };
@@ -54,6 +60,11 @@ const panelKicker = critiquePanel?.querySelector('.panel-kicker');
 const panelTitle = critiquePanel?.querySelector('.panel-title');
 const critiqueMessage = document.getElementById('critique-message');
 const semanticSource  = document.getElementById('semantic-source');
+const mockupBtn = document.getElementById('mockup-btn');
+const mockupSection = document.getElementById('mockup-section');
+const mockupStatus = document.getElementById('mockup-status');
+const mockupImage = document.getElementById('mockup-image');
+const mockupDownload = document.getElementById('mockup-download');
 const aiCritiqueSection = document.getElementById('ai-critique-section');
 const aiSceneItem = document.getElementById('ai-scene-item');
 const aiSceneRead = document.getElementById('ai-scene-read');
@@ -88,7 +99,9 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !workflowModeSelect ||
     !canvas || !emptyState || !critiquePanel || !panelKicker ||
     !panelTitle || !critiqueMessage ||
-    !semanticSource || !aiCritiqueSection || !aiSceneItem ||
+    !semanticSource || !mockupBtn || !mockupSection || !mockupStatus ||
+    !mockupImage || !mockupDownload ||
+    !aiCritiqueSection || !aiSceneItem ||
     !aiSceneRead || !aiValueItem || !aiValueCritique || !aiEdgeItem ||
     !aiEdgeCritique || !aiScopeItem || !aiScope || !aiDemoItem ||
     !aiDemo || !aiRepaintItem || !aiRepaint || !aiPreserveItem ||
@@ -107,7 +120,8 @@ const APP_CONFIG = {
   semanticEndpointStorageKey: 'aps:semanticEndpoint',
   localStaticFrontendPort: '8081',
   localSemanticProxyOrigin: 'http://127.0.0.1:8080',
-  sameOriginSemanticPath: '/api/semantic'
+  sameOriginSemanticPath: '/api/semantic',
+  sameOriginMockupPath: '/api/mockup'
 };
 
 const WORKFLOW_MODES = {
@@ -260,15 +274,23 @@ function getSemanticEndpoint() {
   const override = localStorage.getItem(APP_CONFIG.semanticEndpointStorageKey);
   if (override) return override;
 
+  return getApiEndpoint(APP_CONFIG.sameOriginSemanticPath);
+}
+
+function getMockupEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginMockupPath);
+}
+
+function getApiEndpoint(path) {
   const isLocalFrontend =
     ['127.0.0.1', 'localhost'].includes(window.location.hostname) &&
     window.location.port === APP_CONFIG.localStaticFrontendPort;
 
   if (isLocalFrontend) {
-    return `${APP_CONFIG.localSemanticProxyOrigin}${APP_CONFIG.sameOriginSemanticPath}`;
+    return `${APP_CONFIG.localSemanticProxyOrigin}${path}`;
   }
 
-  return APP_CONFIG.sameOriginSemanticPath;
+  return path;
 }
 
 function getWorkflowMode() {
@@ -545,6 +567,7 @@ function refreshReferenceIdeationCopy(step) {
     critiqueMessage.textContent = getWorkflowCopy().empty;
     aiCritiqueSection.hidden = true;
     nextStepBtn.hidden = true;
+    refreshMockupUi();
     return;
   }
 
@@ -594,6 +617,7 @@ function refreshReferenceIdeationCopy(step) {
   setAiItem(aiUncertaintyItem, aiUncertainty, ideation.uncertaintyNote);
 
   nextStepBtn.hidden = true;
+  refreshMockupUi();
 }
 
 function hasAiNativeCritique() {
@@ -636,6 +660,7 @@ function refreshAiCritiqueCopy() {
   setAiItem(aiPreserveItem, aiPreserve, preserve);
   setAiItem(aiAvoidItem, aiAvoid, avoid);
   setAiItem(aiUncertaintyItem, aiUncertainty, critique.uncertaintyNote);
+  refreshMockupUi();
 }
 
 function setAiLabel(container, text) {
@@ -662,6 +687,102 @@ function lowercaseFirst(text) {
 
 function trimTerminalPunctuation(text) {
   return String(text || '').replace(/[.!?]\s*$/, '');
+}
+
+function resetMockup() {
+  appState.mockup = {
+    status: 'idle',
+    imageDataUrl: '',
+    notes: '',
+    error: ''
+  };
+  refreshMockupUi();
+}
+
+function canGenerateMockup() {
+  return isReferenceIdeationMode() &&
+    !!appState.image.bitmap &&
+    !!appState.semantic &&
+    appState.mockup.status !== 'loading';
+}
+
+function refreshMockupUi() {
+  mockupBtn.hidden = !isReferenceIdeationMode();
+  mockupBtn.disabled = !canGenerateMockup();
+
+  const mockup = appState.mockup;
+  const shouldShow = isReferenceIdeationMode() &&
+    (mockup.status !== 'idle' || !!mockup.imageDataUrl);
+  mockupSection.hidden = !shouldShow;
+  mockupImage.hidden = !mockup.imageDataUrl;
+  mockupDownload.hidden = !mockup.imageDataUrl;
+
+  if (mockup.imageDataUrl) {
+    mockupImage.src = mockup.imageDataUrl;
+    mockupDownload.href = mockup.imageDataUrl;
+  } else {
+    mockupImage.removeAttribute('src');
+    mockupDownload.removeAttribute('href');
+  }
+
+  if (mockup.status === 'loading') {
+    mockupStatus.textContent = 'Generating annotated mockup with Gemini...';
+  } else if (mockup.status === 'succeeded') {
+    mockupStatus.textContent = mockup.notes || 'Annotated mockup generated.';
+  } else if (mockup.status === 'failed') {
+    mockupStatus.textContent = mockup.error || 'Mockup generation failed.';
+  } else {
+    mockupStatus.textContent = 'Waiting for mockup.';
+  }
+}
+
+async function requestAnnotatedMockup() {
+  if (!appState.image.file || !isReferenceIdeationMode()) return;
+
+  appState.mockup = {
+    status: 'loading',
+    imageDataUrl: '',
+    notes: '',
+    error: ''
+  };
+  refreshMockupUi();
+
+  try {
+    const imageData = await fileToBase64(appState.image.file);
+    const response = await fetch(getMockupEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: imageData,
+        mimeType: appState.image.file.type,
+        filename: appState.image.filename,
+        workflowMode: getWorkflowMode(),
+        mode: 'annotated_mockup',
+        ideation: appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap)
+      })
+    });
+
+    if (!response.ok) throw new Error(`mockup endpoint returned ${response.status}`);
+    const payload = await response.json();
+    if (!payload.imageDataUrl) throw new Error('mockup endpoint returned no image');
+
+    appState.mockup = {
+      status: 'succeeded',
+      imageDataUrl: payload.imageDataUrl,
+      notes: payload.notes || '',
+      error: ''
+    };
+  } catch (err) {
+    console.warn('APS: annotated mockup failed:', err);
+    appState.mockup = {
+      status: 'failed',
+      imageDataUrl: '',
+      notes: '',
+      error: 'Could not generate annotated mockup. Check the semantic proxy and Gemini image model.'
+    };
+  }
+
+  refreshMockupUi();
 }
 
 /* ── Canvas render ────────────────────────────────────────────────────────── */
@@ -794,6 +915,7 @@ function setCritiqueStep(step) {
   refreshSemanticCopy();
   refreshSemanticSource();
   refreshCritiqueCopy(step);
+  refreshMockupUi();
 
   nextStepBtn.hidden = useAiCritique;
   nextStepBtn.disabled = !appState.image.bitmap || step === 'repaint';
@@ -831,6 +953,7 @@ async function rerunWorkflowAnalysis() {
   appState.semantic = null;
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.critiqueStep = 'idle';
+  resetMockup();
   setCritiqueStep('idle');
 
   const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
@@ -883,6 +1006,7 @@ fileInput.addEventListener('change', async () => {
     appState.semantic       = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.critiqueStep   = 'idle';
+    resetMockup();
 
     showCanvas();
     renderCanvas(bitmap);
@@ -908,6 +1032,7 @@ fileInput.addEventListener('change', async () => {
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.semanticRequestId += 1;
     appState.critiqueStep = 'idle';
+    resetMockup();
     showEmptyState();
   }
 
@@ -929,6 +1054,7 @@ resetBtn.addEventListener('click', () => {
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.semanticRequestId += 1;
   appState.critiqueStep = 'idle';
+  resetMockup();
   showEmptyState();
 });
 
@@ -941,8 +1067,11 @@ nextStepBtn.addEventListener('click', advanceCritiqueLoop);
 
 workflowModeSelect.addEventListener('change', () => {
   appState.workflowMode = workflowModeSelect.value;
+  resetMockup();
   rerunWorkflowAnalysis();
 });
+
+mockupBtn.addEventListener('click', requestAnnotatedMockup);
 
 /* ── Resize re-fit ────────────────────────────────────────────────────────── */
 

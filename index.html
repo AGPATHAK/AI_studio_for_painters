@@ -76,6 +76,19 @@
           Semantic source: waiting for image
         </p>
 
+        <button class="btn-panel" id="mockup-btn" disabled>
+          Generate Annotated Mockup
+        </button>
+
+        <div class="mockup-section" id="mockup-section" hidden>
+          <p class="section-label">Annotated mockup</p>
+          <p class="mockup-status" id="mockup-status">Waiting for mockup.</p>
+          <img id="mockup-image" alt="AI-generated annotated painterly mockup" hidden>
+          <a class="mockup-download" id="mockup-download" download="ai-painter-annotated-mockup.png" hidden>
+            Download mockup
+          </a>
+        </div>
+
         <div class="ai-critique-section" id="ai-critique-section" hidden>
           <div class="ai-critique-item" id="ai-scene-item">
             <p class="section-label">Scene read</p>

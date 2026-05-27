@@ -322,6 +322,47 @@ body.transitions-ready {
   display: none;
 }
 
+.mockup-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 13px;
+}
+
+.mockup-section[hidden],
+#mockup-image[hidden],
+.mockup-download[hidden] {
+  display: none;
+}
+
+.mockup-status {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  margin-top: 4px;
+}
+
+#mockup-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+}
+
+.mockup-download {
+  display: inline-flex;
+  margin-top: 9px;
+  color: var(--color-accent);
+  font-size: 0.82rem;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.mockup-download:hover {
+  text-decoration: underline;
+}
+
 .ai-critique-section {
   display: flex;
   flex-direction: column;
@@ -382,6 +423,10 @@ body.transitions-ready {
 .btn-panel:disabled {
   opacity: 0.42;
   cursor: not-allowed;
+}
+
+#mockup-btn {
+  margin-top: 0;
 }
 
 .critique-panel[data-step="diagnosis"] .panel-title::after {

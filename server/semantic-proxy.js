@@ -20,6 +20,7 @@ loadEnv(path.join(ROOT_DIR, '.env'));
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '127.0.0.1';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
 const LOCAL_DEV_ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:8081',
   'http://localhost:8081'
@@ -132,20 +133,37 @@ const REFERENCE_IDEATION_SCHEMA = {
   ]
 };
 
+const ANNOTATED_MOCKUP_PROMPT = [
+  'Create an annotated painterly planning mockup from the provided reference image and ideation notes.',
+  'This must be a working watercolor design guide, not final artwork and not a decorative rendering.',
+  'Preserve the original subject, basic composition, and major shape relationships.',
+  'Visibly annotate the image with painter-useful marks: arrows, circled focal area, simplified value mass overlays,',
+  'and short labels such as "merge darks", "soften", "suppress detail", "keep contrast here", "quiet edge", or "value mass".',
+  'Show stronger value grouping, clearer focal hierarchy, reduced clutter, edge hierarchy, and compositional movement.',
+  'Prefer restraint: broad connected shapes, value compression, lost edges, selective accents, and Wesson-like economy without imitation.',
+  'Do not make fantasy art, photoreal enhancement, style-transfer imitation, unrelated repainting, or a polished finished painting.',
+  'Keep labels legible and sparse. The result should look like a painter marked up a planning print before starting a painting.'
+].join(' ');
+
 const server = http.createServer(async (req, res) => {
-  let isSemanticRequest = false;
+  let isApiRequest = false;
 
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    isSemanticRequest = url.pathname === '/api/semantic';
+    isApiRequest = url.pathname === '/api/semantic' || url.pathname === '/api/mockup';
 
-    if (isSemanticRequest && req.method === 'OPTIONS') {
-      sendSemanticPreflight(req, res);
+    if (isApiRequest && req.method === 'OPTIONS') {
+      sendApiPreflight(req, res);
       return;
     }
 
-    if (isSemanticRequest) {
+    if (url.pathname === '/api/semantic') {
       await handleSemantic(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/mockup') {
+      await handleMockup(req, res);
       return;
     }
 
@@ -157,8 +175,8 @@ const server = http.createServer(async (req, res) => {
     serveStatic(url.pathname, req, res);
   } catch (err) {
     console.error('APS proxy: request failed:', err);
-    if (isSemanticRequest) {
-      sendSemanticJson(req, res, 500, { error: 'proxy_error' });
+    if (isApiRequest) {
+      sendApiJson(req, res, 500, { error: 'proxy_error' });
     } else {
       sendJson(res, 500, { error: 'proxy_error' });
     }
@@ -168,17 +186,18 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`APS semantic proxy listening at http://${HOST}:${PORT}`);
   console.log(`Gemini model: ${GEMINI_MODEL}`);
+  console.log(`Gemini image model: ${GEMINI_IMAGE_MODEL}`);
 });
 
 async function handleSemantic(req, res) {
   console.log('APS proxy: semantic request received');
   if (req.method !== 'POST') {
-    sendSemanticJson(req, res, 405, { error: 'method_not_allowed' });
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
     return;
   }
 
   if (!process.env.GEMINI_API_KEY) {
-    sendSemanticJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
     return;
   }
 
@@ -188,13 +207,40 @@ async function handleSemantic(req, res) {
   const workflowMode = normalizeWorkflowMode(body.workflowMode);
 
   if (!image || !['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
-    sendSemanticJson(req, res, 400, { error: 'invalid_image' });
+    sendApiJson(req, res, 400, { error: 'invalid_image' });
     return;
   }
 
   const semantic = await callGeminiSemanticPass(image, mimeType, workflowMode);
   console.log(`APS proxy: ${workflowMode} object created`);
-  sendSemanticJson(req, res, 200, semantic);
+  sendApiJson(req, res, 200, semantic);
+}
+
+async function handleMockup(req, res) {
+  console.log('APS proxy: mockup request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const image = typeof body.image === 'string' ? body.image.trim() : '';
+  const mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
+  const ideation = body.ideation && typeof body.ideation === 'object' ? body.ideation : {};
+
+  if (!image || !['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
+    sendApiJson(req, res, 400, { error: 'invalid_image' });
+    return;
+  }
+
+  const mockup = await callGeminiMockupPass(image, mimeType, ideation);
+  console.log('APS proxy: annotated mockup image created');
+  sendApiJson(req, res, 200, mockup);
 }
 
 async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
@@ -251,6 +297,103 @@ async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
   const parsed = parseSemanticJson(text);
   console.log('APS proxy: parse completed');
   return normalizeSemanticResponse(parsed, workflowMode);
+}
+
+async function callGeminiMockupPass(imageBase64, mimeType, ideation) {
+  const prompt = buildAnnotatedMockupPrompt(ideation);
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_IMAGE_MODEL)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: imageBase64
+              }
+            }
+          ]
+        }],
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE']
+        }
+      })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || `Gemini image model returned ${response.status}`;
+    throw new Error(message);
+  }
+
+  const parts = payload.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find(part => part.inlineData || part.inline_data);
+  if (!imagePart) {
+    throw new Error('Gemini image model returned no image');
+  }
+
+  const inlineData = imagePart.inlineData || imagePart.inline_data;
+  const data = inlineData.data;
+  const outputMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+  if (!data) {
+    throw new Error('Gemini image model returned empty image data');
+  }
+
+  const notes = parts
+    .map(part => cleanText(part.text, ''))
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    source: 'gemini',
+    model: GEMINI_IMAGE_MODEL,
+    mimeType: outputMimeType,
+    image: data,
+    imageDataUrl: `data:${outputMimeType};base64,${data}`,
+    notes
+  };
+}
+
+function buildAnnotatedMockupPrompt(ideation) {
+  const notes = summarizeIdeationForMockup(ideation);
+  return [
+    ANNOTATED_MOCKUP_PROMPT,
+    '',
+    'Current Reference Ideation notes:',
+    notes || 'No structured ideation notes were available. Infer a restrained painterly planning mockup from the image itself.'
+  ].join('\n');
+}
+
+function summarizeIdeationForMockup(ideation) {
+  const fields = [
+    ['Dominant read', ideation.dominantRead],
+    ['Value masses', ideation.valueMasses],
+    ['Atmosphere', ideation.atmosphereOpportunities],
+    ['Focal hierarchy', ideation.focalHierarchy],
+    ['Simplification', ideation.simplificationIdea],
+    ['Crop ideas', ideation.cropIdeas],
+    ['Palette direction', ideation.paletteDirection],
+    ['Suppress', ideation.suppress],
+    ['Emphasize', ideation.emphasize],
+    ['Abstraction', ideation.abstractionOpportunities]
+  ];
+
+  return fields
+    .map(([label, value]) => {
+      const cleaned = cleanText(value, '');
+      return cleaned ? `${label}: ${cleaned}` : '';
+    })
+    .filter(Boolean)
+    .join('\n')
+    .slice(0, 4000);
 }
 
 function normalizeSemanticResponse(raw, workflowMode = WORKFLOW_MODES.IN_PROGRESS_GUIDANCE) {
@@ -810,7 +953,7 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function sendSemanticJson(req, res, status, payload) {
+function sendApiJson(req, res, status, payload) {
   const headers = {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store'
@@ -820,7 +963,7 @@ function sendSemanticJson(req, res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-function sendSemanticPreflight(req, res) {
+function sendApiPreflight(req, res) {
   const headers = { 'Cache-Control': 'no-store' };
   addLocalDevCorsHeaders(req, headers);
   res.writeHead(204, headers);
