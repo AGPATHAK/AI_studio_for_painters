@@ -29,8 +29,8 @@
       <input type="file" id="file-input" accept="image/jpeg,image/png"
              aria-hidden="true" tabindex="-1">
 
-      <div class="left-panel-section">
-        <label class="field-label" for="workflow-mode">Workflow</label>
+      <div class="mode-block">
+        <label class="mode-hint" for="workflow-mode">painting stage</label>
         <select id="workflow-mode" class="mode-select">
           <option value="reference-ideation">Reference Ideation</option>
           <option value="in-progress-guidance">In-Process</option>
@@ -38,20 +38,22 @@
         </select>
       </div>
 
-      <div class="left-panel-section">
-        <button class="btn btn-primary btn-full" id="upload-btn">
-          Upload Reference
+      <button class="btn-load" id="upload-btn">
+        Open reference
+      </button>
+
+      <div class="ai-actions">
+        <button class="btn-read" id="critique-btn" disabled>
+          Explore
         </button>
-        <button class="btn btn-full" id="critique-btn" disabled>
-          Run Ideation
-        </button>
-        <button class="btn btn-full btn-generate" id="mockup-btn" disabled>
-          Generate Mockup
-        </button>
-        <button class="btn btn-full" id="reset-btn" disabled>
-          Reset
+        <button class="btn-annotate" id="mockup-btn" disabled>
+          Annotate
         </button>
       </div>
+
+      <button class="btn-clear" id="reset-btn" disabled>
+        clear
+      </button>
     </nav>
 
     <!-- Centre: canvas display -->

@@ -722,11 +722,11 @@ function refreshWorkflowChrome() {
   panelKicker.textContent = copy.kicker;
   panelTitle.textContent = copy.title;
   uploadBtn.textContent = isInProcessMode()
-    ? 'Upload WIP'
-    : (isFinishedMode() ? 'Upload Painting' : 'Upload Reference');
+    ? 'Open WIP'
+    : (isFinishedMode() ? 'Open painting' : 'Open reference');
   critiqueBtn.textContent = isReferenceIdeationMode()
-    ? 'Run Ideation'
-    : (isInProcessMode() ? 'Critique WIP' : 'Critique Painting');
+    ? 'Explore'
+    : (isInProcessMode() ? 'Read this painting' : 'Final read');
 }
 
 function refreshReferenceIdeationCopy() {
