@@ -47,6 +47,15 @@
 
     <main class="studio-stage" aria-label="Critique workspace">
       <section class="canvas-area" aria-label="Image canvas">
+        <div class="canvas-toggle" id="canvas-toggle" hidden aria-label="Displayed image">
+          <button class="canvas-toggle-btn is-active" id="show-original-btn" type="button">
+            Original
+          </button>
+          <button class="canvas-toggle-btn" id="show-mockup-btn" type="button" disabled>
+            Mockup
+          </button>
+        </div>
+
         <canvas id="main-canvas"
                 role="img"
                 aria-label="Uploaded painting or reference image">

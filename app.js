@@ -38,10 +38,12 @@ const appState = {
   },
   mockup: {
     status: 'idle',      // idle | loading | succeeded | failed
+    bitmap: null,
     imageDataUrl: '',
     notes: '',
     error: ''
   },
+  displayMode: 'original', // original | mockup
   semanticRequestId: 0,
   critiqueStep: 'idle'  // idle | diagnosis | scope | demo | repaint
 };
@@ -55,6 +57,9 @@ const themeBtn    = document.getElementById('theme-btn');
 const workflowModeSelect = document.getElementById('workflow-mode');
 const canvas      = document.getElementById('main-canvas');
 const emptyState  = document.getElementById('empty-state');
+const canvasToggle = document.getElementById('canvas-toggle');
+const showOriginalBtn = document.getElementById('show-original-btn');
+const showMockupBtn = document.getElementById('show-mockup-btn');
 const critiquePanel   = document.getElementById('critique-panel');
 const panelKicker = critiquePanel?.querySelector('.panel-kicker');
 const panelTitle = critiquePanel?.querySelector('.panel-title');
@@ -97,8 +102,9 @@ const nextStepBtn     = document.getElementById('next-step-btn');
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !workflowModeSelect ||
-    !canvas || !emptyState || !critiquePanel || !panelKicker ||
-    !panelTitle || !critiqueMessage ||
+    !canvas || !emptyState || !canvasToggle || !showOriginalBtn ||
+    !showMockupBtn || !critiquePanel || !panelKicker || !panelTitle ||
+    !critiqueMessage ||
     !semanticSource || !mockupBtn || !mockupSection || !mockupStatus ||
     !mockupImage || !mockupDownload ||
     !aiCritiqueSection || !aiSceneItem ||
@@ -690,13 +696,19 @@ function trimTerminalPunctuation(text) {
 }
 
 function resetMockup() {
+  if (appState.mockup.bitmap) {
+    appState.mockup.bitmap.close();
+  }
   appState.mockup = {
     status: 'idle',
+    bitmap: null,
     imageDataUrl: '',
     notes: '',
     error: ''
   };
+  appState.displayMode = 'original';
   refreshMockupUi();
+  renderCurrentDisplay();
 }
 
 function canGenerateMockup() {
@@ -736,16 +748,48 @@ function refreshMockupUi() {
   }
 }
 
+function refreshCanvasToggle() {
+  const hasOriginal = !!appState.image.bitmap;
+  const hasMockup = !!appState.mockup.bitmap;
+
+  canvasToggle.hidden = !hasOriginal;
+  showOriginalBtn.disabled = !hasOriginal;
+  showMockupBtn.disabled = !hasMockup;
+  showOriginalBtn.classList.toggle('is-active', appState.displayMode === 'original');
+  showMockupBtn.classList.toggle('is-active', appState.displayMode === 'mockup');
+}
+
+function setDisplayMode(mode) {
+  if (mode === 'mockup' && !appState.mockup.bitmap) return;
+  appState.displayMode = mode === 'mockup' ? 'mockup' : 'original';
+  refreshCanvasToggle();
+  renderCurrentDisplay();
+}
+
+function getDisplayBitmap() {
+  if (appState.displayMode === 'mockup' && appState.mockup.bitmap) {
+    return appState.mockup.bitmap;
+  }
+  return appState.image.bitmap;
+}
+
 async function requestAnnotatedMockup() {
   if (!appState.image.file || !isReferenceIdeationMode()) return;
 
+  if (appState.mockup.bitmap) {
+    appState.mockup.bitmap.close();
+  }
   appState.mockup = {
     status: 'loading',
+    bitmap: null,
     imageDataUrl: '',
     notes: '',
     error: ''
   };
+  appState.displayMode = 'original';
   refreshMockupUi();
+  refreshCanvasToggle();
+  renderCurrentDisplay();
 
   try {
     const imageData = await fileToBase64(appState.image.file);
@@ -765,24 +809,37 @@ async function requestAnnotatedMockup() {
     if (!response.ok) throw new Error(`mockup endpoint returned ${response.status}`);
     const payload = await response.json();
     if (!payload.imageDataUrl) throw new Error('mockup endpoint returned no image');
+    const mockupBitmap = await imageBitmapFromDataUrl(payload.imageDataUrl);
 
     appState.mockup = {
       status: 'succeeded',
+      bitmap: mockupBitmap,
       imageDataUrl: payload.imageDataUrl,
       notes: payload.notes || '',
       error: ''
     };
+    appState.displayMode = 'mockup';
   } catch (err) {
     console.warn('APS: annotated mockup failed:', err);
     appState.mockup = {
       status: 'failed',
+      bitmap: null,
       imageDataUrl: '',
       notes: '',
       error: 'Could not generate annotated mockup. Check the semantic proxy and Gemini image model.'
     };
+    appState.displayMode = 'original';
   }
 
   refreshMockupUi();
+  refreshCanvasToggle();
+  renderCurrentDisplay();
+}
+
+async function imageBitmapFromDataUrl(dataUrl) {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return createImageBitmap(blob);
 }
 
 /* ── Canvas render ────────────────────────────────────────────────────────── */
@@ -791,8 +848,9 @@ async function requestAnnotatedMockup() {
  * Render an ImageBitmap into the canvas, filling the container while
  * preserving the source aspect ratio.  Never upscales beyond 1:1.
  * @param {ImageBitmap} bitmap
+ * @param {Object} options
  */
-function renderCanvas(bitmap) {
+function renderCanvas(bitmap, options = {}) {
   if (!bitmap) return;
 
   const container = canvas.parentElement;
@@ -812,12 +870,23 @@ function renderCanvas(bitmap) {
   ctx.clearRect(0, 0, drawW, drawH);
   ctx.drawImage(bitmap, 0, 0, drawW, drawH);
 
+  if (!options.allowCritiqueOverlays) return;
+
   if (appState.critiqueStep === 'scope') {
     drawScopeOverlay();
   } else if (appState.critiqueStep === 'demo' ||
              appState.critiqueStep === 'repaint') {
     drawDemonstrationOverlay();
   }
+}
+
+function renderCurrentDisplay() {
+  const bitmap = getDisplayBitmap();
+  if (!bitmap) return;
+
+  renderCanvas(bitmap, {
+    allowCritiqueOverlays: appState.displayMode === 'original'
+  });
 }
 
 function getCritiqueRegion() {
@@ -885,11 +954,13 @@ function showCanvas() {
   resetBtn.disabled   = false;
   critiqueBtn.disabled = false;
   nextStepBtn.disabled = false;
+  refreshCanvasToggle();
 }
 
 function showEmptyState() {
   canvas.hidden       = true;
   emptyState.hidden   = false;
+  canvasToggle.hidden = true;
   resetBtn.disabled   = true;
   critiqueBtn.disabled = true;
   nextStepBtn.disabled = true;
@@ -920,9 +991,7 @@ function setCritiqueStep(step) {
   nextStepBtn.hidden = useAiCritique;
   nextStepBtn.disabled = !appState.image.bitmap || step === 'repaint';
 
-  if (appState.image.bitmap) {
-    renderCanvas(appState.image.bitmap);
-  }
+  renderCurrentDisplay();
   console.log(`APS: critique render complete: ${step}${useAiCritique ? ' (Gemini)' : ' (fallback)'}`);
 }
 
@@ -1009,7 +1078,7 @@ fileInput.addEventListener('change', async () => {
     resetMockup();
 
     showCanvas();
-    renderCanvas(bitmap);
+    renderCurrentDisplay();
     console.log(`APS: upload complete #${requestId}`);
 
     const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
@@ -1073,6 +1142,14 @@ workflowModeSelect.addEventListener('change', () => {
 
 mockupBtn.addEventListener('click', requestAnnotatedMockup);
 
+showOriginalBtn.addEventListener('click', () => {
+  setDisplayMode('original');
+});
+
+showMockupBtn.addEventListener('click', () => {
+  setDisplayMode('mockup');
+});
+
 /* ── Resize re-fit ────────────────────────────────────────────────────────── */
 
 let _resizeTimer = null;
@@ -1081,7 +1158,7 @@ window.addEventListener('resize', () => {
   if (_resizeTimer) clearTimeout(_resizeTimer);
   _resizeTimer = setTimeout(() => {
     if (appState.image.bitmap) {
-      renderCanvas(appState.image.bitmap);
+      renderCurrentDisplay();
     }
   }, 80);   // debounce — enough for smooth drag-resize
 });
