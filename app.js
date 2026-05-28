@@ -42,9 +42,9 @@ const appState = {
     file:     null
   },
   workflowMode: 'reference-ideation',
-  semantic: null,       // narrowly scoped scene labels and value-family hints
+  semantic: null,       // current AI critique or reference ideation payload
   semanticStatus: {
-    source: 'none',     // none | gemini | fallback
+    source: 'none',     // none | gemini
     state: 'unavailable'
   },
   mockup: {
@@ -145,8 +145,7 @@ const WORKFLOW_COPY = {
     ready: 'Reference structure is ready. Run ideation when you want painterly directions.',
     action: 'Run ideation',
     sourceReady: 'Semantic source: Gemini Vision - ideation pass succeeded',
-    sourceFallback: 'Semantic source: Local fallback interpretation - ideation fallback used',
-    sourceUnavailable: 'Semantic source: Local fallback interpretation - ideation unavailable'
+    sourceUnavailable: 'Semantic source: Gemini Vision - ideation unavailable'
   },
   [WORKFLOW_MODES.IN_PROGRESS_GUIDANCE]: {
     kicker: 'In-Process',
@@ -155,8 +154,7 @@ const WORKFLOW_COPY = {
     ready: 'WIP image is ready. Ask for critique and next painting actions.',
     action: 'Critique WIP',
     sourceReady: 'Semantic source: Gemini Vision - in-process critique succeeded',
-    sourceFallback: 'Semantic source: Local fallback interpretation - in-process fallback used',
-    sourceUnavailable: 'Semantic source: Local fallback interpretation - in-process unavailable'
+    sourceUnavailable: 'Semantic source: Gemini Vision - in-process critique unavailable'
   },
   [WORKFLOW_MODES.FINISHED_REVIEW]: {
     kicker: 'Finished Painting',
@@ -165,7 +163,6 @@ const WORKFLOW_COPY = {
     ready: 'Finished painting is ready. Generate a final critique when you want a resolved read.',
     action: 'Generate critique',
     sourceReady: 'Semantic source: Gemini Vision - finished critique succeeded',
-    sourceFallback: 'Semantic source: Local fallback interpretation - finished critique fallback used',
     sourceUnavailable: 'Semantic source: Gemini Vision - finished critique unavailable'
   }
 };
@@ -235,48 +232,6 @@ themeBtn.addEventListener('click', () => {
 
 /* ── Semantic interpretation ──────────────────────────────────────────────── */
 
-const DEFAULT_SEMANTIC_INTERPRETATION = {
-  source: 'fallback',
-  sceneSummary: 'landscape with sky, distant land, water, and foreground growth',
-  regions: [
-    { id: 'sky', label: 'sky opening', position: 'upper field' },
-    { id: 'distant_land', label: 'distant mountain or far shoreline', position: 'upper mid-ground' },
-    { id: 'waterbody', label: 'central waterbody', position: 'middle field' },
-    { id: 'shoreline', label: 'shoreline dark accents', position: 'mid-ground band' },
-    { id: 'vegetation', label: 'foreground vegetation', position: 'lower field' }
-  ],
-  valueFamilies: [
-    {
-      id: 'target_shadow_family',
-      label: 'shoreline and water-shadow band',
-      role: 'dominant shadow family',
-      position: 'mid-ground',
-      regionIds: ['shoreline', 'waterbody']
-    }
-  ],
-  primaryIssue: '',
-  critiqueTarget: 'shoreline and water-shadow band',
-  protectedPassages: ['sky opening', 'main light shape', 'fresh outer washes'],
-  dominantRead: 'A broad light field, a middle value band, and a darker foreground can become the painting\'s main structure.',
-  valueMasses: 'Group the scene into three or four large value families before considering detail.',
-  atmosphereOpportunities: 'Let distance soften, merge small shapes, and keep edges quiet outside the focal passage.',
-  focalHierarchy: 'Choose one dominant contrast area and let surrounding passages support it.',
-  simplificationIdea: 'Use Wesson-like restraint: fewer shapes, broader washes, and accents saved for the final read.',
-  paletteDirection: 'Start with a restrained warm/cool relationship instead of chasing local color.',
-  cropIdeas: 'Test a tighter crop that removes weak margins and gives the main light/dark relationship more authority.',
-  moodPossibilities: 'Consider calm atmospheric understatement before pushing drama.',
-  suppress: 'Suppress incidental detail, equal contrast, and hard edges outside the main idea.',
-  emphasize: 'Emphasize the largest value relationship, the cleanest silhouette, and one focal transition.',
-  abstractionOpportunities: 'Translate repeated small forms into linked shapes and broken-edge passages.'
-};
-
-const SEMANTIC_INTERPRETATION_PROMPT = [
-  'Identify only scene regions and connected shadow/value families.',
-  'Do not critique, improve, generate, beautify, or prescribe edits.',
-  'Return concise JSON: sceneSummary, regions[{id,label,position}],',
-  'valueFamilies[{id,label,role,position,regionIds}], protectedPassages[].'
-].join(' ');
-
 function getSemanticEndpoint() {
   const override = localStorage.getItem(APP_CONFIG.semanticEndpointStorageKey);
   if (override) return override;
@@ -340,225 +295,85 @@ function getActiveImageState() {
   return appState.image;
 }
 
-function normalizeSemanticInterpretation(raw, bitmap) {
-  const fallback = getFallbackSemanticInterpretation(bitmap);
+function cleanUiText(value) {
+  return value === undefined || value === null
+    ? ''
+    : String(value).replace(/\s+/g, ' ').trim();
+}
+
+function normalizeSemanticInterpretation(raw) {
   const safe = (raw && typeof raw === 'object') ? raw : {};
-  const regions = Array.isArray(safe.regions) && safe.regions.length
-    ? safe.regions.map((region, index) => ({
-      id: String(region.id || `region_${index + 1}`),
-      label: String(region.label || fallback.regions[index]?.label || 'scene region'),
-      position: String(region.position || fallback.regions[index]?.position || 'within the painting')
-    }))
-    : fallback.regions;
-
-  const valueFamilies = Array.isArray(safe.valueFamilies) && safe.valueFamilies.length
-    ? safe.valueFamilies.map((family, index) => ({
-      id: String(family.id || `value_family_${index + 1}`),
-      label: String(family.label || fallback.valueFamilies[index]?.label || 'connected shadow family'),
-      role: String(family.role || fallback.valueFamilies[index]?.role || 'value family'),
-      position: String(family.position || fallback.valueFamilies[index]?.position || 'mid-ground'),
-      regionIds: Array.isArray(family.regionIds) ? family.regionIds.map(String) : []
-    }))
-    : fallback.valueFamilies;
-
   return {
     source: safe.source || 'gemini',
-    priorityDiagnosis: String(safe.priorityDiagnosis || ''),
-    sceneRead: String(safe.sceneRead || ''),
-    valueStructureCritique: String(safe.valueStructureCritique || ''),
-    edgeAtmosphereCritique: String(safe.edgeAtmosphereCritique || ''),
-    interventionScope: String(safe.interventionScope || ''),
-    demonstrationDescription: String(safe.demonstrationDescription || ''),
-    repaintHandoff: String(safe.repaintHandoff || ''),
-    preserve: String(safe.preserve || ''),
-    avoid: String(safe.avoid || ''),
-    uncertaintyNote: String(safe.uncertaintyNote || ''),
-    dominantRead: String(safe.dominantRead || fallback.dominantRead || safe.sceneRead || safe.sceneSummary || ''),
-    valueMasses: String(safe.valueMasses || fallback.valueMasses || safe.valueStructureCritique || ''),
-    atmosphereOpportunities: String(safe.atmosphereOpportunities || fallback.atmosphereOpportunities || safe.edgeAtmosphereCritique || ''),
-    focalHierarchy: String(safe.focalHierarchy || fallback.focalHierarchy || ''),
-    simplificationIdea: String(safe.simplificationIdea || fallback.simplificationIdea || safe.demonstrationDescription || ''),
-    paletteDirection: String(safe.paletteDirection || fallback.paletteDirection || ''),
-    cropIdeas: String(safe.cropIdeas || fallback.cropIdeas || ''),
-    moodPossibilities: String(safe.moodPossibilities || fallback.moodPossibilities || ''),
-    suppress: String(safe.suppress || fallback.suppress || safe.avoid || ''),
-    emphasize: String(safe.emphasize || fallback.emphasize || safe.preserve || ''),
-    abstractionOpportunities: String(safe.abstractionOpportunities || fallback.abstractionOpportunities || ''),
-    sceneSummary: String(safe.sceneSummary || fallback.sceneSummary),
-    regions,
-    valueFamilies,
-    primaryIssue: String(safe.primaryIssue || fallback.primaryIssue || ''),
-    critiqueTarget: String(safe.critiqueTarget || fallback.critiqueTarget || valueFamilies[0].label),
-    protectedPassages: Array.isArray(safe.protectedPassages) && safe.protectedPassages.length
-      ? safe.protectedPassages.map(String)
-      : fallback.protectedPassages,
-    repaintFirstAction: String(safe.repaintFirstAction || fallback.repaintFirstAction || ''),
-    repaintPreserve: Array.isArray(safe.repaintPreserve) && safe.repaintPreserve.length
-      ? safe.repaintPreserve.map(String)
-      : [],
-    repaintCaution: String(safe.repaintCaution || fallback.repaintCaution || ''),
-    uncertaintyNotes: Array.isArray(safe.uncertaintyNotes) && safe.uncertaintyNotes.length
-      ? safe.uncertaintyNotes.map(String)
-      : []
+    workflowMode: WORKFLOW_MODES.REFERENCE_IDEATION,
+    sceneSummary: cleanUiText(safe.sceneSummary),
+    dominantRead: cleanUiText(safe.dominantRead),
+    valueMasses: cleanUiText(safe.valueMasses),
+    atmosphereOpportunities: cleanUiText(safe.atmosphereOpportunities),
+    focalHierarchy: cleanUiText(safe.focalHierarchy),
+    simplificationIdea: cleanUiText(safe.simplificationIdea),
+    paletteDirection: cleanUiText(safe.paletteDirection),
+    cropIdeas: cleanUiText(safe.cropIdeas),
+    moodPossibilities: cleanUiText(safe.moodPossibilities),
+    suppress: cleanUiText(safe.suppress),
+    emphasize: cleanUiText(safe.emphasize),
+    abstractionOpportunities: cleanUiText(safe.abstractionOpportunities),
+    uncertaintyNote: cleanUiText(safe.uncertaintyNote)
   };
 }
 
-function normalizeInProcessCritique(raw, bitmap) {
+function normalizeInProcessCritique(raw) {
   const safe = (raw && typeof raw === 'object') ? raw : {};
-  const fallbackRegions = bitmap && bitmap.height > bitmap.width * 1.15
-    ? [
-      { id: 'upper_passage', label: 'upper passage', position: 'upper field' },
-      { id: 'middle_passage', label: 'middle passage', position: 'middle field' },
-      { id: 'lower_passage', label: 'lower passage', position: 'lower field' }
-    ]
-    : [
-      { id: 'left_passage', label: 'left passage', position: 'left field' },
-      { id: 'central_passage', label: 'central passage', position: 'central field' },
-      { id: 'right_passage', label: 'right passage', position: 'right field' }
-    ];
-  const regions = Array.isArray(safe.regions) && safe.regions.length
-    ? safe.regions.map((region, index) => ({
-      id: String(region.id || `region_${index + 1}`),
-      label: String(region.label || 'WIP passage'),
-      position: String(region.position || 'within the current painting')
-    }))
-    : fallbackRegions;
-  const valueFamilies = Array.isArray(safe.valueFamilies) && safe.valueFamilies.length
-    ? safe.valueFamilies.map((family, index) => ({
-      id: String(family.id || `value_family_${index + 1}`),
-      label: String(family.label || 'current WIP value family'),
-      role: String(family.role || 'value family'),
-      position: String(family.position || 'within the current painting'),
-      regionIds: Array.isArray(family.regionIds) ? family.regionIds.map(String) : []
-    }))
-    : [{
-      id: 'current_wip_value_structure',
-      label: 'current WIP value structure',
-      role: 'progress critique target',
-      position: 'within the current painting',
-      regionIds: []
-    }];
-
   return {
     source: safe.source || 'gemini',
     workflowMode: WORKFLOW_MODES.IN_PROGRESS_GUIDANCE,
-    priorityDiagnosis: String(safe.priorityDiagnosis || ''),
-    sceneRead: String(safe.sceneRead || ''),
-    valueStructureCritique: String(safe.valueStructureCritique || ''),
-    edgeAtmosphereCritique: String(safe.edgeAtmosphereCritique || ''),
-    interventionScope: String(safe.interventionScope || ''),
-    demonstrationDescription: String(safe.demonstrationDescription || ''),
-    repaintHandoff: String(safe.repaintHandoff || ''),
-    preserve: String(safe.preserve || ''),
-    avoid: String(safe.avoid || ''),
-    uncertaintyNote: String(safe.uncertaintyNote || ''),
-    sceneSummary: String(safe.sceneSummary || ''),
-    regions,
-    valueFamilies,
-    primaryIssue: String(safe.primaryIssue || ''),
-    critiqueTarget: String(safe.critiqueTarget || valueFamilies[0].label),
-    protectedPassages: Array.isArray(safe.protectedPassages) && safe.protectedPassages.length
-      ? safe.protectedPassages.map(String)
-      : ['fresh washes', 'clear light shapes'],
-    repaintFirstAction: String(safe.repaintFirstAction || ''),
-    repaintPreserve: Array.isArray(safe.repaintPreserve) && safe.repaintPreserve.length
-      ? safe.repaintPreserve.map(String)
-      : [],
-    repaintCaution: String(safe.repaintCaution || ''),
-    uncertaintyNotes: Array.isArray(safe.uncertaintyNotes) && safe.uncertaintyNotes.length
-      ? safe.uncertaintyNotes.map(String)
-      : []
+    priorityDiagnosis: cleanUiText(safe.priorityDiagnosis),
+    sceneRead: cleanUiText(safe.sceneRead),
+    valueStructureCritique: cleanUiText(safe.valueStructureCritique),
+    edgeAtmosphereCritique: cleanUiText(safe.edgeAtmosphereCritique),
+    interventionScope: cleanUiText(safe.interventionScope),
+    demonstrationDescription: cleanUiText(safe.demonstrationDescription),
+    repaintHandoff: cleanUiText(safe.repaintHandoff),
+    preserve: cleanUiText(safe.preserve),
+    avoid: cleanUiText(safe.avoid),
+    uncertaintyNote: cleanUiText(safe.uncertaintyNote),
+    sceneSummary: cleanUiText(safe.sceneSummary)
   };
 }
 
-function normalizeFinishedCritique(raw, bitmap) {
+function normalizeFinishedCritique(raw) {
   const safe = (raw && typeof raw === 'object') ? raw : {};
-  const fallbackRegions = bitmap && bitmap.height > bitmap.width * 1.15
-    ? [
-      { id: 'upper_read', label: 'upper read', position: 'upper field' },
-      { id: 'central_read', label: 'central read', position: 'central field' },
-      { id: 'lower_read', label: 'lower read', position: 'lower field' }
-    ]
-    : [
-      { id: 'left_read', label: 'left read', position: 'left field' },
-      { id: 'central_read', label: 'central read', position: 'central field' },
-      { id: 'right_read', label: 'right read', position: 'right field' }
-    ];
-  const regions = Array.isArray(safe.regions) && safe.regions.length
-    ? safe.regions.map((region, index) => ({
-      id: String(region.id || `region_${index + 1}`),
-      label: String(region.label || 'finished painting passage'),
-      position: String(region.position || 'within the finished painting')
-    }))
-    : fallbackRegions;
-  const valueFamilies = Array.isArray(safe.valueFamilies) && safe.valueFamilies.length
-    ? safe.valueFamilies.map((family, index) => ({
-      id: String(family.id || `value_family_${index + 1}`),
-      label: String(family.label || 'finished painting value structure'),
-      role: String(family.role || 'final value family'),
-      position: String(family.position || 'within the finished painting'),
-      regionIds: Array.isArray(family.regionIds) ? family.regionIds.map(String) : []
-    }))
-    : [{
-      id: 'finished_value_structure',
-      label: 'finished painting value structure',
-      role: 'final critique target',
-      position: 'within the finished painting',
-      regionIds: []
-    }];
-
   return {
     source: safe.source || 'gemini',
     workflowMode: WORKFLOW_MODES.FINISHED_REVIEW,
-    priorityDiagnosis: String(safe.priorityDiagnosis || ''),
-    sceneRead: String(safe.sceneRead || ''),
-    valueStructureCritique: String(safe.valueStructureCritique || ''),
-    edgeAtmosphereCritique: String(safe.edgeAtmosphereCritique || ''),
-    interventionScope: String(safe.interventionScope || ''),
-    demonstrationDescription: String(safe.demonstrationDescription || ''),
-    repaintHandoff: String(safe.repaintHandoff || ''),
-    preserve: String(safe.preserve || ''),
-    avoid: String(safe.avoid || ''),
-    uncertaintyNote: String(safe.uncertaintyNote || ''),
-    sceneSummary: String(safe.sceneSummary || ''),
-    regions,
-    valueFamilies,
-    primaryIssue: String(safe.primaryIssue || ''),
-    critiqueTarget: String(safe.critiqueTarget || valueFamilies[0].label),
-    protectedPassages: Array.isArray(safe.protectedPassages) && safe.protectedPassages.length
-      ? safe.protectedPassages.map(String)
-      : ['resolved passages', 'fresh strongest marks'],
-    repaintFirstAction: String(safe.repaintFirstAction || ''),
-    repaintPreserve: Array.isArray(safe.repaintPreserve) && safe.repaintPreserve.length
-      ? safe.repaintPreserve.map(String)
-      : [],
-    repaintCaution: String(safe.repaintCaution || ''),
-    uncertaintyNotes: Array.isArray(safe.uncertaintyNotes) && safe.uncertaintyNotes.length
-      ? safe.uncertaintyNotes.map(String)
-      : []
+    priorityDiagnosis: cleanUiText(safe.priorityDiagnosis),
+    sceneRead: cleanUiText(safe.sceneRead),
+    valueStructureCritique: cleanUiText(safe.valueStructureCritique),
+    edgeAtmosphereCritique: cleanUiText(safe.edgeAtmosphereCritique),
+    interventionScope: cleanUiText(safe.interventionScope),
+    demonstrationDescription: cleanUiText(safe.demonstrationDescription),
+    repaintHandoff: cleanUiText(safe.repaintHandoff),
+    preserve: cleanUiText(safe.preserve),
+    avoid: cleanUiText(safe.avoid),
+    uncertaintyNote: cleanUiText(safe.uncertaintyNote),
+    sceneSummary: cleanUiText(safe.sceneSummary)
   };
 }
 
-function getFallbackSemanticInterpretation(bitmap) {
-  const interpretation = JSON.parse(JSON.stringify(DEFAULT_SEMANTIC_INTERPRETATION));
-  if (bitmap && bitmap.height > bitmap.width * 1.15) {
-    interpretation.sceneSummary = 'vertical scene with upper background, central subject mass, and lower shadow base';
-    interpretation.regions = [
-      { id: 'upper_background', label: 'upper background plane', position: 'upper field' },
-      { id: 'central_subject', label: 'central subject mass', position: 'middle field' },
-      { id: 'lower_base', label: 'lower base shadow', position: 'lower field' }
-    ];
-    interpretation.valueFamilies = [
-      {
-        id: 'target_shadow_family',
-        label: 'central subject and lower-base shadow family',
-        role: 'dominant shadow family',
-        position: 'middle-to-lower passage',
-        regionIds: ['central_subject', 'lower_base']
-      }
-    ];
-  }
-  return interpretation;
+function hasReferenceIdeation(ideation) {
+  return !!(ideation && [
+    ideation.dominantRead,
+    ideation.valueMasses,
+    ideation.atmosphereOpportunities,
+    ideation.focalHierarchy,
+    ideation.simplificationIdea,
+    ideation.paletteDirection,
+    ideation.cropIdeas,
+    ideation.moodPossibilities,
+    ideation.suppress,
+    ideation.emphasize,
+    ideation.abstractionOpportunities
+  ].some(Boolean));
 }
 
 async function requestSemanticInterpretation(file, bitmap, requestId) {
@@ -570,7 +385,6 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
   }
 
   console.log(`APS: semantic pass start #${requestId}`);
-  const fallback = getFallbackSemanticInterpretation(bitmap);
   const endpoint = getSemanticEndpoint();
   const workflowMode = getWorkflowMode();
 
@@ -586,34 +400,36 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
         image: imageData,
         mimeType: file.type,
         filename: file.name,
-        workflowMode,
-        purpose: 'scene_regions_and_value_families_only',
-        prompt: SEMANTIC_INTERPRETATION_PROMPT
+        workflowMode
       }),
       signal: controller.signal
     });
     if (!response.ok) throw new Error(`semantic endpoint returned ${response.status}`);
     const payload = await response.json();
     console.log(`APS: Gemini response received #${requestId}`);
-    const semantic = normalizeSemanticInterpretation(payload, bitmap);
+    const semantic = normalizeSemanticInterpretation(payload);
+    if (!hasReferenceIdeation(semantic)) {
+      throw new Error('Gemini response incomplete');
+    }
     console.log(`APS: critique object created #${requestId}`);
     return {
       semantic,
       status: {
-        source: semantic.source === 'gemini' ? 'gemini' : 'fallback',
-        state: semantic.source === 'gemini' ? 'succeeded' : 'fallback',
+        source: 'gemini',
+        state: 'succeeded',
         detail: ''
       }
     };
   } catch (err) {
-    console.warn(`APS: semantic interpretation fallback used #${requestId}:`, err);
-    console.log(`APS: semantic pass fallback #${requestId}`);
+    console.warn(`APS: semantic interpretation unavailable #${requestId}:`, err);
     return {
-      semantic: fallback,
+      semantic: null,
       status: {
-        source: 'fallback',
-        state: err.name === 'AbortError' ? 'unavailable' : 'fallback',
-        detail: ''
+        source: 'none',
+        state: 'unavailable',
+        detail: err.name === 'AbortError'
+          ? 'AI ideation timed out. Please retry.'
+          : `AI ideation unavailable. ${err.message || 'Please retry.'}`
       }
     };
   } finally {
@@ -676,12 +492,15 @@ async function requestInProcessCritique(file, bitmap, requestId) {
     if (!response.ok) throw new Error(`in-process endpoint returned ${response.status}`);
     const payload = await response.json();
     console.log(`APS: Gemini in-process response received #${requestId}`);
-    const semantic = normalizeInProcessCritique(payload, bitmap);
+    const semantic = normalizeInProcessCritique(payload);
+    if (!hasInProcessCritique(semantic)) {
+      throw new Error('Gemini response incomplete');
+    }
     return {
       semantic,
       status: {
-        source: semantic.source === 'gemini' ? 'gemini' : 'fallback',
-        state: semantic.source === 'gemini' ? 'succeeded' : 'fallback',
+        source: 'gemini',
+        state: 'succeeded',
         detail: ''
       }
     };
@@ -727,12 +546,15 @@ async function requestFinishedCritique(file, bitmap, requestId) {
     if (!response.ok) throw new Error(`finished endpoint returned ${response.status}`);
     const payload = await response.json();
     console.log(`APS: Gemini finished response received #${requestId}`);
-    const semantic = normalizeFinishedCritique(payload, bitmap);
+    const semantic = normalizeFinishedCritique(payload);
+    if (!hasFinishedCritique(semantic)) {
+      throw new Error('Gemini response incomplete');
+    }
     return {
       semantic,
       status: {
-        source: semantic.source === 'gemini' ? 'gemini' : 'fallback',
-        state: semantic.source === 'gemini' ? 'succeeded' : 'fallback',
+        source: 'gemini',
+        state: 'succeeded',
         detail: ''
       }
     };
@@ -775,27 +597,6 @@ function fileToBase64(file) {
   });
 }
 
-function getTargetValueFamily() {
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
-  return semantic.valueFamilies[0];
-}
-
-function getProtectedPassages() {
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
-  const passages = semantic.repaintPreserve?.length
-    ? semantic.repaintPreserve
-    : semantic.protectedPassages;
-  return passages.join(', ');
-}
-
-function getRegionReadout() {
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
-  return semantic.regions
-    .slice(0, 5)
-    .map(region => `${region.label} (${region.position})`)
-    .join('; ');
-}
-
 function refreshSemanticSource() {
   const status = appState.semanticStatus;
   const copy = getWorkflowCopy();
@@ -814,8 +615,6 @@ function refreshSemanticSource() {
     semanticSource.textContent = copy.sourceReady;
   } else if (status.state === 'unavailable') {
     semanticSource.textContent = status.detail || copy.sourceUnavailable;
-  } else if (status.source === 'fallback') {
-    semanticSource.textContent = copy.sourceFallback;
   } else {
     semanticSource.textContent = 'Semantic source: waiting for image';
   }
@@ -867,8 +666,8 @@ function refreshInProcessCopy() {
   aiCritiqueSection.hidden = true;
 }
 
-function hasInProcessCritique() {
-  const critique = appState.semantic || {};
+function hasInProcessCritique(semantic = appState.semantic) {
+  const critique = semantic || {};
   return !!(
     critique.priorityDiagnosis ||
     critique.sceneRead ||
@@ -906,8 +705,8 @@ function refreshFinishedCopy() {
   aiCritiqueSection.hidden = true;
 }
 
-function hasFinishedCritique() {
-  const critique = appState.semantic || {};
+function hasFinishedCritique(semantic = appState.semantic) {
+  const critique = semantic || {};
   return !!(
     critique.priorityDiagnosis ||
     critique.sceneRead ||
@@ -936,7 +735,16 @@ function refreshReferenceIdeationCopy() {
     return;
   }
 
-  const ideation = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  const ideation = appState.semantic;
+  if (!hasReferenceIdeation(ideation)) {
+    critiqueMessage.textContent = appState.semanticStatus.state === 'unavailable'
+      ? (appState.semanticStatus.detail || 'AI ideation unavailable. Please retry.')
+      : getWorkflowCopy().ready;
+    aiCritiqueSection.hidden = true;
+    refreshMockupUi();
+    return;
+  }
+
   const hasGeminiIdeation = appState.semanticStatus.source === 'gemini';
   const dominantRead = ideation.dominantRead || ideation.sceneRead || ideation.sceneSummary;
   const valueMasses = ideation.valueMasses || ideation.valueStructureCritique;
@@ -977,8 +785,8 @@ function refreshReferenceIdeationCopy() {
   setAiItem(aiScopeItem, aiScope, compositionIdeas);
   setAiItem(aiDemoItem, aiDemo, simplification);
   setAiItem(aiRepaintItem, aiRepaint, paletteMood);
-  setAiItem(aiPreserveItem, aiPreserve, ideation.emphasize || ideation.preserve);
-  setAiItem(aiAvoidItem, aiAvoid, ideation.suppress || ideation.avoid);
+  setAiItem(aiPreserveItem, aiPreserve, ideation.emphasize);
+  setAiItem(aiAvoidItem, aiAvoid, ideation.suppress);
   setAiItem(aiUncertaintyItem, aiUncertainty, ideation.uncertaintyNote);
 
   refreshMockupUi();
@@ -986,18 +794,20 @@ function refreshReferenceIdeationCopy() {
 
 function refreshAiCritiqueCopy() {
   const critique = appState.semantic;
-  const family = getTargetValueFamily();
-  const protectedPassages = getProtectedPassages();
-  const target = critique.critiqueTarget || family.label;
-  const sceneRead = critique.sceneRead || critique.sceneSummary || getRegionReadout();
-  const valueCritique = critique.valueStructureCritique || critique.primaryIssue || critique.priorityDiagnosis;
-  const scope = critique.interventionScope ||
-    `${target}, in the ${family.position || 'selected passage'}. ${protectedPassages} stay untouched.`;
-  const demo = critique.demonstrationDescription ||
-    (target ? `A useful demonstration would simplify ${target} without finishing the painting.` : '');
-  const repaint = critique.repaintHandoff || critique.repaintFirstAction;
-  const preserve = critique.preserve || protectedPassages;
-  const avoid = critique.avoid || critique.repaintCaution;
+  if (!critique) {
+    critiqueMessage.textContent = 'AI critique unavailable. Please retry.';
+    aiCritiqueSection.hidden = true;
+    refreshMockupUi();
+    return;
+  }
+
+  const sceneRead = critique.sceneRead || critique.sceneSummary;
+  const valueCritique = critique.valueStructureCritique || critique.priorityDiagnosis;
+  const scope = critique.interventionScope;
+  const demo = critique.demonstrationDescription;
+  const repaint = critique.repaintHandoff;
+  const preserve = critique.preserve;
+  const avoid = critique.avoid;
 
   setAiLabel(aiSceneItem, isFinishedMode() ? 'First read' : 'Scene read');
   setAiLabel(aiValueItem, 'Value structure');
@@ -1009,7 +819,11 @@ function refreshAiCritiqueCopy() {
   setAiLabel(aiAvoidItem, 'Avoid');
   setAiLabel(aiUncertaintyItem, 'Uncertainty');
 
-  critiqueMessage.textContent = critique.priorityDiagnosis || critique.primaryIssue || valueCritique;
+  critiqueMessage.textContent = critique.priorityDiagnosis ||
+    valueCritique ||
+    sceneRead ||
+    repaint ||
+    'AI critique unavailable. Please retry.';
   setAiItem(aiSceneItem, aiSceneRead, sceneRead);
   setAiItem(aiValueItem, aiValueCritique, valueCritique);
   setAiItem(aiEdgeItem, aiEdgeCritique, critique.edgeAtmosphereCritique);
@@ -1151,7 +965,7 @@ async function requestAnnotatedMockup() {
         filename: sourceImage.filename,
         workflowMode: getWorkflowMode(),
         mode: 'annotated_mockup',
-        ideation: appState.semantic || getFallbackSemanticInterpretation(sourceImage.bitmap)
+        ideation: appState.semantic || {}
       })
     });
 
