@@ -64,7 +64,7 @@ const uploadBtn   = document.getElementById('upload-btn');
 const resetBtn    = document.getElementById('reset-btn');
 const critiqueBtn = document.getElementById('critique-btn');
 const themeBtn    = document.getElementById('theme-btn');
-const workflowModeSelect = document.getElementById('workflow-mode');
+const modeTabs = document.querySelectorAll('.mode-tab');
 const canvas      = document.getElementById('main-canvas');
 const emptyState  = document.getElementById('empty-state');
 const canvasToggle = document.getElementById('canvas-toggle');
@@ -102,7 +102,7 @@ const aiUncertainty = document.getElementById('ai-uncertainty');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
-    !workflowModeSelect ||
+    !modeTabs.length ||
     !canvas || !emptyState || !canvasToggle || !showOriginalBtn ||
     !showMockupBtn || !critiquePanel || !panelKicker || !panelTitle ||
     !critiqueMessage ||
@@ -1227,19 +1227,30 @@ critiqueBtn.addEventListener('click', () => {
   rerunWorkflowAnalysis();
 });
 
-workflowModeSelect.addEventListener('change', () => {
-  appState.workflowMode = workflowModeSelect.value;
-  appState.displayMode = 'original';
-  appState.semantic = null;
-  appState.semanticStatus = { source: 'none', state: 'unavailable' };
-  renderCurrentDisplay();
-  refreshCanvasToggle();
-  if (getActiveImageState().bitmap) {
-    showCanvas();
-  } else {
-    showEmptyState();
-  }
-  rerunWorkflowAnalysis();
+function setActiveTab(mode) {
+  modeTabs.forEach(tab => {
+    tab.classList.toggle('is-active', tab.dataset.mode === mode);
+  });
+}
+
+modeTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+    if (mode === appState.workflowMode) return;
+    appState.workflowMode = mode;
+    setActiveTab(mode);
+    appState.displayMode = 'original';
+    appState.semantic = null;
+    appState.semanticStatus = { source: 'none', state: 'unavailable' };
+    renderCurrentDisplay();
+    refreshCanvasToggle();
+    if (getActiveImageState().bitmap) {
+      showCanvas();
+    } else {
+      showEmptyState();
+    }
+    rerunWorkflowAnalysis();
+  });
 });
 
 mockupBtn.addEventListener('click', requestAnnotatedMockup);
@@ -1268,5 +1279,5 @@ window.addEventListener('resize', () => {
 /* ── Initialise ───────────────────────────────────────────────────────────── */
 
 initTheme();
-workflowModeSelect.value = getWorkflowMode();
+setActiveTab(getWorkflowMode());
 showEmptyState();

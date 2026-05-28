@@ -29,13 +29,16 @@
       <input type="file" id="file-input" accept="image/jpeg,image/png"
              aria-hidden="true" tabindex="-1">
 
-      <div class="mode-block">
-        <label class="mode-hint" for="workflow-mode">painting stage</label>
-        <select id="workflow-mode" class="mode-select">
-          <option value="reference-ideation">Reference Ideation</option>
-          <option value="in-progress-guidance">In-Process</option>
-          <option value="finished-review">Finished Painting</option>
-        </select>
+      <div class="mode-tabs" role="group" aria-label="Painting stage">
+        <button class="mode-tab is-active" data-mode="reference-ideation" type="button">
+          Reference
+        </button>
+        <button class="mode-tab" data-mode="in-progress-guidance" type="button">
+          In-Process
+        </button>
+        <button class="mode-tab" data-mode="finished-review" type="button">
+          Finished
+        </button>
       </div>
 
       <button class="btn-load" id="upload-btn">
