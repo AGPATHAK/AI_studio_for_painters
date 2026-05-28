@@ -36,6 +36,12 @@ const appState = {
     filename: null,
     file:     null
   },
+  finishedImage: {
+    bitmap:   null,
+    srcUrl:   null,
+    filename: null,
+    file:     null
+  },
   workflowMode: 'reference-ideation',
   semantic: null,       // narrowly scoped scene labels and value-family hints
   semanticStatus: {
@@ -134,7 +140,8 @@ const APP_CONFIG = {
   localSemanticProxyOrigin: 'http://127.0.0.1:8080',
   sameOriginSemanticPath: '/api/semantic',
   sameOriginMockupPath: '/api/mockup',
-  sameOriginInProcessPath: '/api/in-process'
+  sameOriginInProcessPath: '/api/in-process',
+  sameOriginFinishedPath: '/api/finished-critique'
 };
 
 const WORKFLOW_MODES = {
@@ -165,14 +172,14 @@ const WORKFLOW_COPY = {
     sourceUnavailable: 'Semantic source: Local fallback interpretation - in-process unavailable'
   },
   [WORKFLOW_MODES.FINISHED_REVIEW]: {
-    kicker: 'Finished review',
-    title: 'Reflective review',
-    empty: 'Upload a finished painting for a lightweight review placeholder.',
-    ready: 'Finished Review uses the current guidance behavior for now.',
-    action: 'Run review',
-    sourceReady: 'Semantic source: Gemini Vision - review placeholder used guidance pass',
-    sourceFallback: 'Semantic source: Local fallback interpretation - review fallback used',
-    sourceUnavailable: 'Semantic source: Local fallback interpretation - review unavailable'
+    kicker: 'Finished Painting',
+    title: 'Final critique',
+    empty: 'Upload a finished painting for a juror-style critique.',
+    ready: 'Finished painting is ready. Generate a final critique when you want a resolved read.',
+    action: 'Generate critique',
+    sourceReady: 'Semantic source: Gemini Vision - finished critique succeeded',
+    sourceFallback: 'Semantic source: Local fallback interpretation - finished critique fallback used',
+    sourceUnavailable: 'Semantic source: Gemini Vision - finished critique unavailable'
   }
 };
 
@@ -298,6 +305,10 @@ function getInProcessEndpoint() {
   return getApiEndpoint(APP_CONFIG.sameOriginInProcessPath);
 }
 
+function getFinishedEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginFinishedPath);
+}
+
 function getApiEndpoint(path) {
   const isLocalFrontend =
     ['127.0.0.1', 'localhost'].includes(window.location.hostname) &&
@@ -324,6 +335,10 @@ function isInProcessMode() {
   return getWorkflowMode() === WORKFLOW_MODES.IN_PROGRESS_GUIDANCE;
 }
 
+function isFinishedMode() {
+  return getWorkflowMode() === WORKFLOW_MODES.FINISHED_REVIEW;
+}
+
 function getWorkflowCopy() {
   return WORKFLOW_COPY[getWorkflowMode()] || WORKFLOW_COPY[WORKFLOW_MODES.REFERENCE_IDEATION];
 }
@@ -333,7 +348,9 @@ function makeEmptyImageState() {
 }
 
 function getActiveImageState() {
-  return isInProcessMode() ? appState.wipImage : appState.image;
+  if (isInProcessMode()) return appState.wipImage;
+  if (isFinishedMode()) return appState.finishedImage;
+  return appState.image;
 }
 
 function normalizeSemanticInterpretation(raw, bitmap) {
@@ -467,6 +484,74 @@ function normalizeInProcessCritique(raw, bitmap) {
   };
 }
 
+function normalizeFinishedCritique(raw, bitmap) {
+  const safe = (raw && typeof raw === 'object') ? raw : {};
+  const fallbackRegions = bitmap && bitmap.height > bitmap.width * 1.15
+    ? [
+      { id: 'upper_read', label: 'upper read', position: 'upper field' },
+      { id: 'central_read', label: 'central read', position: 'central field' },
+      { id: 'lower_read', label: 'lower read', position: 'lower field' }
+    ]
+    : [
+      { id: 'left_read', label: 'left read', position: 'left field' },
+      { id: 'central_read', label: 'central read', position: 'central field' },
+      { id: 'right_read', label: 'right read', position: 'right field' }
+    ];
+  const regions = Array.isArray(safe.regions) && safe.regions.length
+    ? safe.regions.map((region, index) => ({
+      id: String(region.id || `region_${index + 1}`),
+      label: String(region.label || 'finished painting passage'),
+      position: String(region.position || 'within the finished painting')
+    }))
+    : fallbackRegions;
+  const valueFamilies = Array.isArray(safe.valueFamilies) && safe.valueFamilies.length
+    ? safe.valueFamilies.map((family, index) => ({
+      id: String(family.id || `value_family_${index + 1}`),
+      label: String(family.label || 'finished painting value structure'),
+      role: String(family.role || 'final value family'),
+      position: String(family.position || 'within the finished painting'),
+      regionIds: Array.isArray(family.regionIds) ? family.regionIds.map(String) : []
+    }))
+    : [{
+      id: 'finished_value_structure',
+      label: 'finished painting value structure',
+      role: 'final critique target',
+      position: 'within the finished painting',
+      regionIds: []
+    }];
+
+  return {
+    source: safe.source || 'gemini',
+    workflowMode: WORKFLOW_MODES.FINISHED_REVIEW,
+    priorityDiagnosis: String(safe.priorityDiagnosis || ''),
+    sceneRead: String(safe.sceneRead || ''),
+    valueStructureCritique: String(safe.valueStructureCritique || ''),
+    edgeAtmosphereCritique: String(safe.edgeAtmosphereCritique || ''),
+    interventionScope: String(safe.interventionScope || ''),
+    demonstrationDescription: String(safe.demonstrationDescription || ''),
+    repaintHandoff: String(safe.repaintHandoff || ''),
+    preserve: String(safe.preserve || ''),
+    avoid: String(safe.avoid || ''),
+    uncertaintyNote: String(safe.uncertaintyNote || ''),
+    sceneSummary: String(safe.sceneSummary || ''),
+    regions,
+    valueFamilies,
+    primaryIssue: String(safe.primaryIssue || ''),
+    critiqueTarget: String(safe.critiqueTarget || valueFamilies[0].label),
+    protectedPassages: Array.isArray(safe.protectedPassages) && safe.protectedPassages.length
+      ? safe.protectedPassages.map(String)
+      : ['resolved passages', 'fresh strongest marks'],
+    repaintFirstAction: String(safe.repaintFirstAction || ''),
+    repaintPreserve: Array.isArray(safe.repaintPreserve) && safe.repaintPreserve.length
+      ? safe.repaintPreserve.map(String)
+      : [],
+    repaintCaution: String(safe.repaintCaution || ''),
+    uncertaintyNotes: Array.isArray(safe.uncertaintyNotes) && safe.uncertaintyNotes.length
+      ? safe.uncertaintyNotes.map(String)
+      : []
+  };
+}
+
 function getFallbackSemanticInterpretation(bitmap) {
   const interpretation = JSON.parse(JSON.stringify(DEFAULT_SEMANTIC_INTERPRETATION));
   if (bitmap && bitmap.height > bitmap.width * 1.15) {
@@ -492,6 +577,9 @@ function getFallbackSemanticInterpretation(bitmap) {
 async function requestSemanticInterpretation(file, bitmap, requestId) {
   if (isInProcessMode()) {
     return requestInProcessCritique(file, bitmap, requestId);
+  }
+  if (isFinishedMode()) {
+    return requestFinishedCritique(file, bitmap, requestId);
   }
 
   console.log(`APS: semantic pass start #${requestId}`);
@@ -547,6 +635,36 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
   }
 }
 
+function addOptionalContextImages(body) {
+  const contextTasks = [];
+
+  if (appState.image.file) {
+    contextTasks.push(fileToBase64(appState.image.file).then(image => {
+      body.referenceImage = image;
+      body.referenceMimeType = appState.image.file.type;
+      body.referenceFilename = appState.image.filename;
+    }));
+  }
+
+  if (appState.wipImage.file) {
+    contextTasks.push(fileToBase64(appState.wipImage.file).then(image => {
+      body.wipImage = image;
+      body.wipMimeType = appState.wipImage.file.type;
+      body.wipFilename = appState.wipImage.filename;
+    }));
+  }
+
+  if (appState.mockup.imageDataUrl) {
+    const mockupData = dataUrlToImagePayload(appState.mockup.imageDataUrl);
+    if (mockupData) {
+      body.mockupImage = mockupData.image;
+      body.mockupMimeType = mockupData.mimeType;
+    }
+  }
+
+  return Promise.all(contextTasks);
+}
+
 async function requestInProcessCritique(file, bitmap, requestId) {
   console.log(`APS: in-process critique start #${requestId}`);
   const controller = new AbortController();
@@ -560,19 +678,7 @@ async function requestInProcessCritique(file, bitmap, requestId) {
       workflowMode: WORKFLOW_MODES.IN_PROGRESS_GUIDANCE
     };
 
-    if (appState.image.file) {
-      body.referenceImage = await fileToBase64(appState.image.file);
-      body.referenceMimeType = appState.image.file.type;
-      body.referenceFilename = appState.image.filename;
-    }
-
-    if (appState.mockup.imageDataUrl) {
-      const mockupData = dataUrlToImagePayload(appState.mockup.imageDataUrl);
-      if (mockupData) {
-        body.mockupImage = mockupData.image;
-        body.mockupMimeType = mockupData.mimeType;
-      }
-    }
+    await addOptionalContextImages(body);
 
     const response = await fetch(getInProcessEndpoint(), {
       method: 'POST',
@@ -606,6 +712,57 @@ async function requestInProcessCritique(file, bitmap, requestId) {
     };
   } finally {
     console.log(`APS: in-process critique complete #${requestId}`);
+    window.clearTimeout(timeoutId);
+  }
+}
+
+async function requestFinishedCritique(file, bitmap, requestId) {
+  console.log(`APS: finished critique start #${requestId}`);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const body = {
+      finishedImage: await fileToBase64(file),
+      finishedMimeType: file.type,
+      finishedFilename: file.name,
+      workflowMode: WORKFLOW_MODES.FINISHED_REVIEW
+    };
+
+    await addOptionalContextImages(body);
+
+    const response = await fetch(getFinishedEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`finished endpoint returned ${response.status}`);
+    const payload = await response.json();
+    console.log(`APS: Gemini finished response received #${requestId}`);
+    const semantic = normalizeFinishedCritique(payload, bitmap);
+    return {
+      semantic,
+      status: {
+        source: semantic.source === 'gemini' ? 'gemini' : 'fallback',
+        state: semantic.source === 'gemini' ? 'succeeded' : 'fallback',
+        detail: ''
+      }
+    };
+  } catch (err) {
+    console.warn(`APS: finished critique unavailable #${requestId}:`, err);
+    return {
+      semantic: null,
+      status: {
+        source: 'none',
+        state: 'unavailable',
+        detail: err.name === 'AbortError'
+          ? 'Gemini finished critique timed out.'
+          : `Gemini finished critique failed: ${err.message || 'unknown error'}`
+      }
+    };
+  } finally {
+    console.log(`APS: finished critique complete #${requestId}`);
     window.clearTimeout(timeoutId);
   }
 }
@@ -667,9 +824,13 @@ function refreshSemanticSource() {
                            !status.detail);
 
   if (status.state === 'loading') {
-    semanticSource.textContent = isInProcessMode()
-      ? 'Semantic source: asking Gemini for WIP critique'
-      : 'Semantic source: asking Gemini Vision';
+    if (isInProcessMode()) {
+      semanticSource.textContent = 'Semantic source: asking Gemini for WIP critique';
+    } else if (isFinishedMode()) {
+      semanticSource.textContent = 'Semantic source: asking Gemini for finished critique';
+    } else {
+      semanticSource.textContent = 'Semantic source: asking Gemini Vision';
+    }
   } else if (status.source === 'gemini') {
     semanticSource.textContent = copy.sourceReady;
   } else if (status.state === 'unavailable') {
@@ -690,6 +851,11 @@ function refreshCritiqueCopy(step) {
 
   if (isInProcessMode()) {
     refreshInProcessCopy();
+    return;
+  }
+
+  if (isFinishedMode()) {
+    refreshFinishedCopy();
     return;
   }
 
@@ -779,12 +945,56 @@ function hasInProcessCritique() {
   );
 }
 
+function refreshFinishedCopy() {
+  const copy = getWorkflowCopy();
+  const hasFinished = !!appState.finishedImage.bitmap;
+  const status = appState.semanticStatus;
+
+  if (!hasFinished) {
+    critiqueMessage.textContent = copy.empty;
+    aiCritiqueSection.hidden = true;
+    nextStepBtn.hidden = true;
+    return;
+  }
+
+  if (status.state === 'loading') {
+    critiqueMessage.textContent = 'Asking Gemini for a finished painting critique...';
+    aiCritiqueSection.hidden = true;
+    nextStepBtn.hidden = true;
+    return;
+  }
+
+  if (status.source === 'gemini' && hasFinishedCritique()) {
+    refreshAiCritiqueCopy();
+    return;
+  }
+
+  critiqueMessage.textContent = status.state === 'unavailable'
+    ? 'Gemini critique did not complete. The finished painting is loaded, but no final critique was generated.'
+    : copy.ready;
+  aiCritiqueSection.hidden = true;
+  nextStepBtn.hidden = true;
+}
+
+function hasFinishedCritique() {
+  const critique = appState.semantic || {};
+  return !!(
+    critique.priorityDiagnosis ||
+    critique.sceneRead ||
+    critique.valueStructureCritique ||
+    critique.edgeAtmosphereCritique ||
+    critique.repaintHandoff
+  );
+}
+
 function refreshWorkflowChrome() {
   const copy = getWorkflowCopy();
   critiquePanel.dataset.workflow = getWorkflowMode();
   panelKicker.textContent = copy.kicker;
   panelTitle.textContent = copy.title;
-  uploadBtn.textContent = isInProcessMode() ? 'WIP' : 'Upload';
+  uploadBtn.textContent = isInProcessMode()
+    ? 'WIP'
+    : (isFinishedMode() ? 'Final' : 'Upload');
   critiqueBtn.textContent = isReferenceIdeationMode() ? 'Idea' : 'Crit';
 }
 
@@ -866,12 +1076,12 @@ function refreshAiCritiqueCopy() {
   const preserve = critique.preserve || protectedPassages;
   const avoid = critique.avoid || critique.repaintCaution;
 
-  setAiLabel(aiSceneItem, 'Scene read');
+  setAiLabel(aiSceneItem, isFinishedMode() ? 'First read' : 'Scene read');
   setAiLabel(aiValueItem, 'Value structure');
-  setAiLabel(aiEdgeItem, 'Edges and atmosphere');
-  setAiLabel(aiScopeItem, 'Scope');
-  setAiLabel(aiDemoItem, 'Demonstration');
-  setAiLabel(aiRepaintItem, 'Repaint handoff');
+  setAiLabel(aiEdgeItem, isFinishedMode() ? 'Edges and finish' : 'Edges and atmosphere');
+  setAiLabel(aiScopeItem, isFinishedMode() ? 'Final adjustment scope' : 'Scope');
+  setAiLabel(aiDemoItem, isFinishedMode() ? 'Resolution test' : 'Demonstration');
+  setAiLabel(aiRepaintItem, isFinishedMode() ? 'Final verdict' : 'Repaint handoff');
   setAiLabel(aiPreserveItem, 'Preserve');
   setAiLabel(aiAvoidItem, 'Avoid');
   setAiLabel(aiUncertaintyItem, 'Uncertainty');
@@ -1101,7 +1311,7 @@ function renderCanvas(bitmap, options = {}) {
   ctx.clearRect(0, 0, drawW, drawH);
   ctx.drawImage(bitmap, 0, 0, drawW, drawH);
 
-  if (!options.allowCritiqueOverlays || isInProcessMode()) return;
+  if (!options.allowCritiqueOverlays || isInProcessMode() || isFinishedMode()) return;
 
   if (appState.critiqueStep === 'scope') {
     drawScopeOverlay();
@@ -1205,7 +1415,8 @@ function setCritiqueStep(step) {
   console.log(`APS: critique render trigger: ${step}`);
   appState.critiqueStep = step;
 
-  const useAiCritique = isReferenceIdeationMode() || isInProcessMode() || hasAiNativeCritique();
+  const useAiCritique = isReferenceIdeationMode() || isInProcessMode() ||
+    isFinishedMode() || hasAiNativeCritique();
   aiCritiqueSection.hidden = !useAiCritique;
   semanticSection.hidden = useAiCritique || !(step === 'diagnosis' || step === 'scope' ||
                                               step === 'demo' || step === 'repaint');
@@ -1258,7 +1469,9 @@ async function rerunWorkflowAnalysis() {
     state: 'loading',
     detail: isInProcessMode()
       ? 'Semantic source: asking Gemini for WIP critique'
-      : 'Semantic source: asking Gemini Vision'
+      : (isFinishedMode()
+        ? 'Semantic source: asking Gemini for finished critique'
+        : 'Semantic source: asking Gemini Vision')
   };
   appState.critiqueStep = 'idle';
   if (isReferenceIdeationMode()) resetMockup();
@@ -1318,13 +1531,13 @@ fileInput.addEventListener('change', async () => {
     appState.semantic       = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.critiqueStep   = 'idle';
-    if (isReferenceIdeationMode()) resetMockup();
+    if (supportsAnnotatedMockup()) resetMockup();
 
     showCanvas();
     renderCurrentDisplay();
     console.log(`APS: upload complete #${requestId}`);
 
-    if (isInProcessMode()) {
+    if (isInProcessMode() || isFinishedMode()) {
       setCritiqueStep('idle');
       fileInput.value = '';
       return;
@@ -1347,6 +1560,8 @@ fileInput.addEventListener('change', async () => {
     URL.revokeObjectURL(url);
     if (isInProcessMode()) {
       appState.wipImage = makeEmptyImageState();
+    } else if (isFinishedMode()) {
+      appState.finishedImage = makeEmptyImageState();
     } else {
       appState.image = makeEmptyImageState();
     }
@@ -1354,7 +1569,7 @@ fileInput.addEventListener('change', async () => {
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.semanticRequestId += 1;
     appState.critiqueStep = 'idle';
-    if (isReferenceIdeationMode()) resetMockup();
+    if (supportsAnnotatedMockup()) resetMockup();
     showEmptyState();
   }
 
@@ -1374,6 +1589,8 @@ resetBtn.addEventListener('click', () => {
   }
   if (isInProcessMode()) {
     appState.wipImage = makeEmptyImageState();
+  } else if (isFinishedMode()) {
+    appState.finishedImage = makeEmptyImageState();
   } else {
     appState.image = makeEmptyImageState();
   }

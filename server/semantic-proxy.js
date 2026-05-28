@@ -157,12 +157,25 @@ const IN_PROCESS_PROMPT = [
   'Return JSON only, in the requested field order. Each field should be concise but actionable in the studio.'
 ].join(' ');
 
+const FINISHED_CRITIQUE_PROMPT = [
+  'You are an experienced watercolor painter and juror reviewing a finished painting.',
+  'This is Finished Painting Critique Mode. The first image is the completed painting and is sufficient by itself.',
+  'A reference, annotated mockup, or WIP may follow as optional context only; judge the finished painting as the main work.',
+  'Do not give a beginner tutorial. Give serious painter feedback about whether the piece feels resolved.',
+  'Critique first-read impact, focal hierarchy, value organization, edge hierarchy, compositional unity, color harmony,',
+  'fresh versus overworked passages, brush economy, visual flow, emotional read, framing/cropping, and whether to stop or continue.',
+  'Be candid and specific. Avoid excessive positivity, decorative adjectives, AI-art phrasing, and generic encouragement.',
+  'If further changes risk overworking the painting, say so clearly.',
+  'Return JSON only, in the requested field order. Each field should sound like a concise exhibition or studio critique.'
+].join(' ');
+
 const server = http.createServer(async (req, res) => {
   let isApiRequest = false;
 
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process'].includes(url.pathname);
+    isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process',
+      '/api/finished-critique'].includes(url.pathname);
 
     if (isApiRequest && req.method === 'OPTIONS') {
       sendApiPreflight(req, res);
@@ -181,6 +194,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/in-process') {
       await handleInProcess(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/finished-critique') {
+      await handleFinishedCritique(req, res);
       return;
     }
 
@@ -300,6 +318,54 @@ async function handleInProcess(req, res) {
     mockupMimeType
   });
   console.log('APS proxy: in-process critique object created');
+  sendApiJson(req, res, 200, critique);
+}
+
+async function handleFinishedCritique(req, res) {
+  console.log('APS proxy: finished critique request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const finishedImage = typeof body.finishedImage === 'string' ? body.finishedImage.trim() : '';
+  const finishedMimeType = typeof body.finishedMimeType === 'string' ? body.finishedMimeType : '';
+  const referenceImage = typeof body.referenceImage === 'string' ? body.referenceImage.trim() : '';
+  const referenceMimeType = typeof body.referenceMimeType === 'string' ? body.referenceMimeType : '';
+  const wipImage = typeof body.wipImage === 'string' ? body.wipImage.trim() : '';
+  const wipMimeType = typeof body.wipMimeType === 'string' ? body.wipMimeType : '';
+  const mockupImage = typeof body.mockupImage === 'string' ? body.mockupImage.trim() : '';
+  const mockupMimeType = typeof body.mockupMimeType === 'string' ? body.mockupMimeType : '';
+
+  if (!finishedImage || !isSupportedImageMimeType(finishedMimeType)) {
+    sendApiJson(req, res, 400, { error: 'invalid_finished_image' });
+    return;
+  }
+
+  if ((referenceImage && !isSupportedImageMimeType(referenceMimeType)) ||
+      (wipImage && !isSupportedImageMimeType(wipMimeType)) ||
+      (mockupImage && !isSupportedImageMimeType(mockupMimeType))) {
+    sendApiJson(req, res, 400, { error: 'invalid_context_image' });
+    return;
+  }
+
+  const critique = await callGeminiFinishedPass({
+    finishedImage,
+    finishedMimeType,
+    referenceImage,
+    referenceMimeType,
+    wipImage,
+    wipMimeType,
+    mockupImage,
+    mockupMimeType
+  });
+  console.log('APS proxy: finished critique object created');
   sendApiJson(req, res, 200, critique);
 }
 
@@ -435,6 +501,94 @@ async function callGeminiInProcessPass(context) {
   return normalizeSemanticResponse(parsed, WORKFLOW_MODES.IN_PROGRESS_GUIDANCE);
 }
 
+async function callGeminiFinishedPass(context) {
+  const parts = [
+    { text: buildFinishedCritiquePrompt(context) },
+    { text: 'Finished painting image:' },
+    {
+      inline_data: {
+        mime_type: context.finishedMimeType,
+        data: context.finishedImage
+      }
+    }
+  ];
+
+  if (context.referenceImage) {
+    parts.push(
+      { text: 'Optional reference context image:' },
+      {
+        inline_data: {
+          mime_type: context.referenceMimeType,
+          data: context.referenceImage
+        }
+      }
+    );
+  }
+
+  if (context.wipImage) {
+    parts.push(
+      { text: 'Optional WIP context image:' },
+      {
+        inline_data: {
+          mime_type: context.wipMimeType,
+          data: context.wipImage
+        }
+      }
+    );
+  }
+
+  if (context.mockupImage) {
+    parts.push(
+      { text: 'Optional annotated mockup context image:' },
+      {
+        inline_data: {
+          mime_type: context.mockupMimeType,
+          data: context.mockupImage
+        }
+      }
+    );
+  }
+
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          response_schema: SEMANTIC_SCHEMA,
+          temperature: 0.25,
+          max_output_tokens: 2400
+        }
+      })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || `Gemini returned ${response.status}`;
+    throw new Error(message);
+  }
+
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map(part => part.text || '')
+    .join('')
+    .trim();
+
+  if (!text) {
+    throw new Error('Gemini returned no finished critique JSON');
+  }
+
+  console.log(`APS proxy: Gemini finished response received: ${previewText(text)}`);
+  const parsed = parseSemanticJson(text);
+  return normalizeSemanticResponse(parsed, WORKFLOW_MODES.FINISHED_REVIEW);
+}
+
 async function callGeminiMockupPass(imageBase64, mimeType, ideation) {
   const prompt = buildAnnotatedMockupPrompt(ideation);
   const response = await fetch(
@@ -526,6 +680,28 @@ function buildInProcessPrompt(context) {
     'For demonstrationDescription, describe the kind of small study mark or mental overlay that would clarify the correction.',
     'For repaintHandoff, give 3 to 5 ordered next painting actions in one compact paragraph.',
     'For preserve and avoid, be specific about what should stay fresh and what action would make the WIP worse.'
+  ].join('\n');
+}
+
+function buildFinishedCritiquePrompt(context) {
+  const contextLine = [
+    context.referenceImage ? 'reference photo available' : 'no reference photo supplied',
+    context.wipImage ? 'WIP image available' : 'no WIP image supplied',
+    context.mockupImage ? 'annotated mockup available' : 'no annotated mockup supplied'
+  ].join('; ');
+
+  return [
+    FINISHED_CRITIQUE_PROMPT,
+    '',
+    `Context: ${contextLine}.`,
+    'For priorityDiagnosis, state the strongest final critique in terms of resolution or unresolved weakness.',
+    'For sceneRead, describe the first read of the finished painting, not the source material.',
+    'For valueStructureCritique, judge value organization and readability.',
+    'For edgeAtmosphereCritique, judge edge hierarchy, freshness, overworked passages, and brush economy.',
+    'For interventionScope, say whether any final adjustment is narrow enough to risk, or whether the painting should stop.',
+    'For demonstrationDescription, describe a mental comparison or small test, not a tutorial demo.',
+    'For repaintHandoff, give a concise final verdict with any limited next actions and explicit stop/continue guidance.',
+    'For preserve and avoid, identify what must remain untouched and what would weaken the finished work.'
   ].join('\n');
 }
 
