@@ -30,6 +30,12 @@ const appState = {
     filename: null,   // original filename | null
     file:     null    // original File object | null, retained only for mode reruns
   },
+  wipImage: {
+    bitmap:   null,
+    srcUrl:   null,
+    filename: null,
+    file:     null
+  },
   workflowMode: 'reference-ideation',
   semantic: null,       // narrowly scoped scene labels and value-family hints
   semanticStatus: {
@@ -127,7 +133,8 @@ const APP_CONFIG = {
   localStaticFrontendPort: '8081',
   localSemanticProxyOrigin: 'http://127.0.0.1:8080',
   sameOriginSemanticPath: '/api/semantic',
-  sameOriginMockupPath: '/api/mockup'
+  sameOriginMockupPath: '/api/mockup',
+  sameOriginInProcessPath: '/api/in-process'
 };
 
 const WORKFLOW_MODES = {
@@ -148,14 +155,14 @@ const WORKFLOW_COPY = {
     sourceUnavailable: 'Semantic source: Local fallback interpretation - ideation unavailable'
   },
   [WORKFLOW_MODES.IN_PROGRESS_GUIDANCE]: {
-    kicker: 'In-progress guidance',
-    title: 'One visual lesson',
-    empty: 'Upload a painting, then run the minimal critique loop.',
-    ready: 'Scene structure is labeled. Run the minimal critique loop when ready.',
-    action: 'Run critique',
-    sourceReady: 'Semantic source: Gemini Vision - guidance pass succeeded',
-    sourceFallback: 'Semantic source: Local fallback interpretation - guidance fallback used',
-    sourceUnavailable: 'Semantic source: Local fallback interpretation - guidance unavailable'
+    kicker: 'In-Process',
+    title: 'WIP critique',
+    empty: 'Upload a work-in-progress painting photo to get next-step guidance.',
+    ready: 'WIP image is ready. Ask for critique and next painting actions.',
+    action: 'Critique WIP',
+    sourceReady: 'Semantic source: Gemini Vision - in-process critique succeeded',
+    sourceFallback: 'Semantic source: Local fallback interpretation - in-process fallback used',
+    sourceUnavailable: 'Semantic source: Local fallback interpretation - in-process unavailable'
   },
   [WORKFLOW_MODES.FINISHED_REVIEW]: {
     kicker: 'Finished review',
@@ -287,6 +294,10 @@ function getMockupEndpoint() {
   return getApiEndpoint(APP_CONFIG.sameOriginMockupPath);
 }
 
+function getInProcessEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginInProcessPath);
+}
+
 function getApiEndpoint(path) {
   const isLocalFrontend =
     ['127.0.0.1', 'localhost'].includes(window.location.hostname) &&
@@ -309,8 +320,20 @@ function isReferenceIdeationMode() {
   return getWorkflowMode() === WORKFLOW_MODES.REFERENCE_IDEATION;
 }
 
+function isInProcessMode() {
+  return getWorkflowMode() === WORKFLOW_MODES.IN_PROGRESS_GUIDANCE;
+}
+
 function getWorkflowCopy() {
   return WORKFLOW_COPY[getWorkflowMode()] || WORKFLOW_COPY[WORKFLOW_MODES.REFERENCE_IDEATION];
+}
+
+function makeEmptyImageState() {
+  return { bitmap: null, srcUrl: null, filename: null, file: null };
+}
+
+function getActiveImageState() {
+  return isInProcessMode() ? appState.wipImage : appState.image;
 }
 
 function normalizeSemanticInterpretation(raw, bitmap) {
@@ -376,6 +399,74 @@ function normalizeSemanticInterpretation(raw, bitmap) {
   };
 }
 
+function normalizeInProcessCritique(raw, bitmap) {
+  const safe = (raw && typeof raw === 'object') ? raw : {};
+  const fallbackRegions = bitmap && bitmap.height > bitmap.width * 1.15
+    ? [
+      { id: 'upper_passage', label: 'upper passage', position: 'upper field' },
+      { id: 'middle_passage', label: 'middle passage', position: 'middle field' },
+      { id: 'lower_passage', label: 'lower passage', position: 'lower field' }
+    ]
+    : [
+      { id: 'left_passage', label: 'left passage', position: 'left field' },
+      { id: 'central_passage', label: 'central passage', position: 'central field' },
+      { id: 'right_passage', label: 'right passage', position: 'right field' }
+    ];
+  const regions = Array.isArray(safe.regions) && safe.regions.length
+    ? safe.regions.map((region, index) => ({
+      id: String(region.id || `region_${index + 1}`),
+      label: String(region.label || 'WIP passage'),
+      position: String(region.position || 'within the current painting')
+    }))
+    : fallbackRegions;
+  const valueFamilies = Array.isArray(safe.valueFamilies) && safe.valueFamilies.length
+    ? safe.valueFamilies.map((family, index) => ({
+      id: String(family.id || `value_family_${index + 1}`),
+      label: String(family.label || 'current WIP value family'),
+      role: String(family.role || 'value family'),
+      position: String(family.position || 'within the current painting'),
+      regionIds: Array.isArray(family.regionIds) ? family.regionIds.map(String) : []
+    }))
+    : [{
+      id: 'current_wip_value_structure',
+      label: 'current WIP value structure',
+      role: 'progress critique target',
+      position: 'within the current painting',
+      regionIds: []
+    }];
+
+  return {
+    source: safe.source || 'gemini',
+    workflowMode: WORKFLOW_MODES.IN_PROGRESS_GUIDANCE,
+    priorityDiagnosis: String(safe.priorityDiagnosis || ''),
+    sceneRead: String(safe.sceneRead || ''),
+    valueStructureCritique: String(safe.valueStructureCritique || ''),
+    edgeAtmosphereCritique: String(safe.edgeAtmosphereCritique || ''),
+    interventionScope: String(safe.interventionScope || ''),
+    demonstrationDescription: String(safe.demonstrationDescription || ''),
+    repaintHandoff: String(safe.repaintHandoff || ''),
+    preserve: String(safe.preserve || ''),
+    avoid: String(safe.avoid || ''),
+    uncertaintyNote: String(safe.uncertaintyNote || ''),
+    sceneSummary: String(safe.sceneSummary || ''),
+    regions,
+    valueFamilies,
+    primaryIssue: String(safe.primaryIssue || ''),
+    critiqueTarget: String(safe.critiqueTarget || valueFamilies[0].label),
+    protectedPassages: Array.isArray(safe.protectedPassages) && safe.protectedPassages.length
+      ? safe.protectedPassages.map(String)
+      : ['fresh washes', 'clear light shapes'],
+    repaintFirstAction: String(safe.repaintFirstAction || ''),
+    repaintPreserve: Array.isArray(safe.repaintPreserve) && safe.repaintPreserve.length
+      ? safe.repaintPreserve.map(String)
+      : [],
+    repaintCaution: String(safe.repaintCaution || ''),
+    uncertaintyNotes: Array.isArray(safe.uncertaintyNotes) && safe.uncertaintyNotes.length
+      ? safe.uncertaintyNotes.map(String)
+      : []
+  };
+}
+
 function getFallbackSemanticInterpretation(bitmap) {
   const interpretation = JSON.parse(JSON.stringify(DEFAULT_SEMANTIC_INTERPRETATION));
   if (bitmap && bitmap.height > bitmap.width * 1.15) {
@@ -399,6 +490,10 @@ function getFallbackSemanticInterpretation(bitmap) {
 }
 
 async function requestSemanticInterpretation(file, bitmap, requestId) {
+  if (isInProcessMode()) {
+    return requestInProcessCritique(file, bitmap, requestId);
+  }
+
   console.log(`APS: semantic pass start #${requestId}`);
   const fallback = getFallbackSemanticInterpretation(bitmap);
   const endpoint = getSemanticEndpoint();
@@ -452,6 +547,78 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
   }
 }
 
+async function requestInProcessCritique(file, bitmap, requestId) {
+  console.log(`APS: in-process critique start #${requestId}`);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const body = {
+      wipImage: await fileToBase64(file),
+      wipMimeType: file.type,
+      wipFilename: file.name,
+      workflowMode: WORKFLOW_MODES.IN_PROGRESS_GUIDANCE
+    };
+
+    if (appState.image.file) {
+      body.referenceImage = await fileToBase64(appState.image.file);
+      body.referenceMimeType = appState.image.file.type;
+      body.referenceFilename = appState.image.filename;
+    }
+
+    if (appState.mockup.imageDataUrl) {
+      const mockupData = dataUrlToImagePayload(appState.mockup.imageDataUrl);
+      if (mockupData) {
+        body.mockupImage = mockupData.image;
+        body.mockupMimeType = mockupData.mimeType;
+      }
+    }
+
+    const response = await fetch(getInProcessEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`in-process endpoint returned ${response.status}`);
+    const payload = await response.json();
+    console.log(`APS: Gemini in-process response received #${requestId}`);
+    const semantic = normalizeInProcessCritique(payload, bitmap);
+    return {
+      semantic,
+      status: {
+        source: semantic.source === 'gemini' ? 'gemini' : 'fallback',
+        state: semantic.source === 'gemini' ? 'succeeded' : 'fallback',
+        detail: ''
+      }
+    };
+  } catch (err) {
+    console.warn(`APS: in-process critique unavailable #${requestId}:`, err);
+    return {
+      semantic: null,
+      status: {
+        source: 'none',
+        state: 'unavailable',
+        detail: err.name === 'AbortError'
+          ? 'Gemini in-process critique timed out.'
+          : `Gemini in-process critique failed: ${err.message || 'unknown error'}`
+      }
+    };
+  } finally {
+    console.log(`APS: in-process critique complete #${requestId}`);
+    window.clearTimeout(timeoutId);
+  }
+}
+
+function dataUrlToImagePayload(dataUrl) {
+  const match = String(dataUrl || '').match(/^data:([^;,]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    mimeType: match[1],
+    image: match[2]
+  };
+}
+
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -465,12 +632,12 @@ function fileToBase64(file) {
 }
 
 function getTargetValueFamily() {
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
   return semantic.valueFamilies[0];
 }
 
 function getProtectedPassages() {
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
   const passages = semantic.repaintPreserve?.length
     ? semantic.repaintPreserve
     : semantic.protectedPassages;
@@ -478,7 +645,7 @@ function getProtectedPassages() {
 }
 
 function getRegionReadout() {
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
   return semantic.regions
     .slice(0, 5)
     .map(region => `${region.label} (${region.position})`)
@@ -496,12 +663,17 @@ function refreshSemanticCopy() {
 function refreshSemanticSource() {
   const status = appState.semanticStatus;
   const copy = getWorkflowCopy();
-  semanticSource.hidden = (status.source === 'none');
+  semanticSource.hidden = (status.source === 'none' && status.state !== 'loading' &&
+                           !status.detail);
 
-  if (status.source === 'gemini') {
+  if (status.state === 'loading') {
+    semanticSource.textContent = isInProcessMode()
+      ? 'Semantic source: asking Gemini for WIP critique'
+      : 'Semantic source: asking Gemini Vision';
+  } else if (status.source === 'gemini') {
     semanticSource.textContent = copy.sourceReady;
   } else if (status.state === 'unavailable') {
-    semanticSource.textContent = copy.sourceUnavailable;
+    semanticSource.textContent = status.detail || copy.sourceUnavailable;
   } else if (status.source === 'fallback') {
     semanticSource.textContent = copy.sourceFallback;
   } else {
@@ -516,12 +688,17 @@ function refreshCritiqueCopy(step) {
     return;
   }
 
+  if (isInProcessMode()) {
+    refreshInProcessCopy();
+    return;
+  }
+
   if (hasAiNativeCritique()) {
     refreshAiCritiqueCopy();
     return;
   }
 
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap);
+  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
   const family = getTargetValueFamily();
   const protectedPassages = getProtectedPassages();
   const familyLabel = semantic.critiqueTarget || family.label;
@@ -541,7 +718,7 @@ function refreshCritiqueCopy(step) {
 
   if (step === 'idle') {
     const copy = getWorkflowCopy();
-    critiqueMessage.textContent = appState.image.bitmap
+    critiqueMessage.textContent = getActiveImageState().bitmap
       ? copy.ready
       : copy.empty;
     nextStepBtn.textContent = copy.action;
@@ -560,11 +737,54 @@ function refreshCritiqueCopy(step) {
   }
 }
 
+function refreshInProcessCopy() {
+  const copy = getWorkflowCopy();
+  const hasWip = !!appState.wipImage.bitmap;
+  const status = appState.semanticStatus;
+
+  if (!hasWip) {
+    critiqueMessage.textContent = copy.empty;
+    aiCritiqueSection.hidden = true;
+    nextStepBtn.hidden = true;
+    return;
+  }
+
+  if (status.state === 'loading') {
+    critiqueMessage.textContent = 'Asking Gemini to critique this WIP image...';
+    aiCritiqueSection.hidden = true;
+    nextStepBtn.hidden = true;
+    return;
+  }
+
+  if (status.source === 'gemini' && hasInProcessCritique()) {
+    refreshAiCritiqueCopy();
+    return;
+  }
+
+  critiqueMessage.textContent = status.state === 'unavailable'
+    ? 'Gemini critique did not complete. The WIP image is loaded, but no AI guidance was generated.'
+    : copy.ready;
+  aiCritiqueSection.hidden = true;
+  nextStepBtn.hidden = true;
+}
+
+function hasInProcessCritique() {
+  const critique = appState.semantic || {};
+  return !!(
+    critique.priorityDiagnosis ||
+    critique.sceneRead ||
+    critique.valueStructureCritique ||
+    critique.edgeAtmosphereCritique ||
+    critique.repaintHandoff
+  );
+}
+
 function refreshWorkflowChrome() {
   const copy = getWorkflowCopy();
   critiquePanel.dataset.workflow = getWorkflowMode();
   panelKicker.textContent = copy.kicker;
   panelTitle.textContent = copy.title;
+  uploadBtn.textContent = isInProcessMode() ? 'WIP' : 'Upload';
   critiqueBtn.textContent = isReferenceIdeationMode() ? 'Idea' : 'Crit';
 }
 
@@ -749,8 +969,8 @@ function refreshMockupUi() {
 }
 
 function refreshCanvasToggle() {
-  const hasOriginal = !!appState.image.bitmap;
-  const hasMockup = !!appState.mockup.bitmap;
+  const hasOriginal = !!getActiveImageState().bitmap;
+  const hasMockup = isReferenceIdeationMode() && !!appState.mockup.bitmap;
 
   canvasToggle.hidden = !hasOriginal;
   showOriginalBtn.disabled = !hasOriginal;
@@ -767,10 +987,10 @@ function setDisplayMode(mode) {
 }
 
 function getDisplayBitmap() {
-  if (appState.displayMode === 'mockup' && appState.mockup.bitmap) {
+  if (isReferenceIdeationMode() && appState.displayMode === 'mockup' && appState.mockup.bitmap) {
     return appState.mockup.bitmap;
   }
-  return appState.image.bitmap;
+  return getActiveImageState().bitmap;
 }
 
 async function requestAnnotatedMockup() {
@@ -870,7 +1090,7 @@ function renderCanvas(bitmap, options = {}) {
   ctx.clearRect(0, 0, drawW, drawH);
   ctx.drawImage(bitmap, 0, 0, drawW, drawH);
 
-  if (!options.allowCritiqueOverlays) return;
+  if (!options.allowCritiqueOverlays || isInProcessMode()) return;
 
   if (appState.critiqueStep === 'scope') {
     drawScopeOverlay();
@@ -955,6 +1175,7 @@ function showCanvas() {
   critiqueBtn.disabled = false;
   nextStepBtn.disabled = false;
   refreshCanvasToggle();
+  refreshWorkflowChrome();
 }
 
 function showEmptyState() {
@@ -973,7 +1194,7 @@ function setCritiqueStep(step) {
   console.log(`APS: critique render trigger: ${step}`);
   appState.critiqueStep = step;
 
-  const useAiCritique = isReferenceIdeationMode() || hasAiNativeCritique();
+  const useAiCritique = isReferenceIdeationMode() || isInProcessMode() || hasAiNativeCritique();
   aiCritiqueSection.hidden = !useAiCritique;
   semanticSection.hidden = useAiCritique || !(step === 'diagnosis' || step === 'scope' ||
                                               step === 'demo' || step === 'repaint');
@@ -989,14 +1210,14 @@ function setCritiqueStep(step) {
   refreshMockupUi();
 
   nextStepBtn.hidden = useAiCritique;
-  nextStepBtn.disabled = !appState.image.bitmap || step === 'repaint';
+  nextStepBtn.disabled = !getActiveImageState().bitmap || step === 'repaint';
 
   renderCurrentDisplay();
   console.log(`APS: critique render complete: ${step}${useAiCritique ? ' (Gemini)' : ' (fallback)'}`);
 }
 
 function advanceCritiqueLoop() {
-  if (!appState.image.bitmap) return;
+  if (!getActiveImageState().bitmap) return;
 
   if (appState.critiqueStep === 'idle') {
     setCritiqueStep('diagnosis');
@@ -1010,23 +1231,30 @@ function advanceCritiqueLoop() {
 }
 
 async function rerunWorkflowAnalysis() {
-  if (!appState.image.bitmap || !appState.image.file) {
-    setCritiqueStep(appState.image.bitmap ? 'diagnosis' : 'idle');
+  const activeImage = getActiveImageState();
+  if (!activeImage.bitmap || !activeImage.file) {
+    setCritiqueStep(activeImage.bitmap ? 'diagnosis' : 'idle');
     return;
   }
 
   const requestId = appState.semanticRequestId + 1;
-  const bitmap = appState.image.bitmap;
-  const file = appState.image.file;
+  const bitmap = activeImage.bitmap;
+  const file = activeImage.file;
   appState.semanticRequestId = requestId;
   appState.semantic = null;
-  appState.semanticStatus = { source: 'none', state: 'unavailable' };
+  appState.semanticStatus = {
+    source: 'none',
+    state: 'loading',
+    detail: isInProcessMode()
+      ? 'Semantic source: asking Gemini for WIP critique'
+      : 'Semantic source: asking Gemini Vision'
+  };
   appState.critiqueStep = 'idle';
-  resetMockup();
+  if (isReferenceIdeationMode()) resetMockup();
   setCritiqueStep('idle');
 
   const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
-  if (requestId !== appState.semanticRequestId || bitmap !== appState.image.bitmap) {
+  if (requestId !== appState.semanticRequestId || bitmap !== getActiveImageState().bitmap) {
     console.log(`APS: stale workflow result ignored #${requestId}`);
     return;
   }
@@ -1047,13 +1275,14 @@ fileInput.addEventListener('change', async () => {
   console.log('APS: upload event fired');
   const file = fileInput.files[0];
   if (!file) return;
+  const activeImage = getActiveImageState();
   const requestId = appState.semanticRequestId + 1;
   appState.semanticRequestId = requestId;
 
   // Revoke any previous ObjectURL to free memory
-  if (appState.image.srcUrl) {
-    URL.revokeObjectURL(appState.image.srcUrl);
-    appState.image.srcUrl = null;
+  if (activeImage.srcUrl) {
+    URL.revokeObjectURL(activeImage.srcUrl);
+    activeImage.srcUrl = null;
   }
 
   const url = URL.createObjectURL(file);
@@ -1068,21 +1297,30 @@ fileInput.addEventListener('change', async () => {
       return;
     }
 
-    appState.image.bitmap   = bitmap;
-    appState.image.srcUrl   = url;
-    appState.image.filename = file.name;
-    appState.image.file     = file;
+    if (activeImage.bitmap) {
+      activeImage.bitmap.close();
+    }
+    activeImage.bitmap   = bitmap;
+    activeImage.srcUrl   = url;
+    activeImage.filename = file.name;
+    activeImage.file     = file;
     appState.semantic       = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.critiqueStep   = 'idle';
-    resetMockup();
+    if (isReferenceIdeationMode()) resetMockup();
 
     showCanvas();
     renderCurrentDisplay();
     console.log(`APS: upload complete #${requestId}`);
 
+    if (isInProcessMode()) {
+      setCritiqueStep('idle');
+      fileInput.value = '';
+      return;
+    }
+
     const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
-    if (requestId !== appState.semanticRequestId || bitmap !== appState.image.bitmap) {
+    if (requestId !== appState.semanticRequestId || bitmap !== getActiveImageState().bitmap) {
       console.log(`APS: stale semantic result ignored #${requestId}`);
       fileInput.value = '';
       return;
@@ -1096,12 +1334,16 @@ fileInput.addEventListener('change', async () => {
   } catch (err) {
     console.error('APS: failed to decode image:', err);
     URL.revokeObjectURL(url);
-    appState.image = { bitmap: null, srcUrl: null, filename: null, file: null };
+    if (isInProcessMode()) {
+      appState.wipImage = makeEmptyImageState();
+    } else {
+      appState.image = makeEmptyImageState();
+    }
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.semanticRequestId += 1;
     appState.critiqueStep = 'idle';
-    resetMockup();
+    if (isReferenceIdeationMode()) resetMockup();
     showEmptyState();
   }
 
@@ -1112,23 +1354,28 @@ fileInput.addEventListener('change', async () => {
 /* ── Reset ────────────────────────────────────────────────────────────────── */
 
 resetBtn.addEventListener('click', () => {
-  if (appState.image.bitmap) {
-    appState.image.bitmap.close();   // release GPU/memory
+  const activeImage = getActiveImageState();
+  if (activeImage.bitmap) {
+    activeImage.bitmap.close();   // release GPU/memory
   }
-  if (appState.image.srcUrl) {
-    URL.revokeObjectURL(appState.image.srcUrl);
+  if (activeImage.srcUrl) {
+    URL.revokeObjectURL(activeImage.srcUrl);
   }
-  appState.image = { bitmap: null, srcUrl: null, filename: null, file: null };
+  if (isInProcessMode()) {
+    appState.wipImage = makeEmptyImageState();
+  } else {
+    appState.image = makeEmptyImageState();
+  }
   appState.semantic = null;
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.semanticRequestId += 1;
   appState.critiqueStep = 'idle';
-  resetMockup();
+  if (isReferenceIdeationMode()) resetMockup();
   showEmptyState();
 });
 
 critiqueBtn.addEventListener('click', () => {
-  if (!appState.image.bitmap) return;
+  if (!getActiveImageState().bitmap) return;
   rerunWorkflowAnalysis();
 });
 
@@ -1136,7 +1383,16 @@ nextStepBtn.addEventListener('click', advanceCritiqueLoop);
 
 workflowModeSelect.addEventListener('change', () => {
   appState.workflowMode = workflowModeSelect.value;
-  resetMockup();
+  appState.displayMode = 'original';
+  appState.semantic = null;
+  appState.semanticStatus = { source: 'none', state: 'unavailable' };
+  renderCurrentDisplay();
+  refreshCanvasToggle();
+  if (getActiveImageState().bitmap) {
+    showCanvas();
+  } else {
+    showEmptyState();
+  }
   rerunWorkflowAnalysis();
 });
 
@@ -1157,7 +1413,7 @@ let _resizeTimer = null;
 window.addEventListener('resize', () => {
   if (_resizeTimer) clearTimeout(_resizeTimer);
   _resizeTimer = setTimeout(() => {
-    if (appState.image.bitmap) {
+    if (getActiveImageState().bitmap) {
       renderCurrentDisplay();
     }
   }, 80);   // debounce — enough for smooth drag-resize

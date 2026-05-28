@@ -11,7 +11,7 @@ const path = require('node:path');
 
 const SERVER_DIR = __dirname;
 const ROOT_DIR = path.resolve(SERVER_DIR, '..');
-const MAX_BODY_BYTES = 12 * 1024 * 1024;
+const MAX_BODY_BYTES = 30 * 1024 * 1024;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 loadEnv(path.join(SERVER_DIR, '.env'));
@@ -145,12 +145,24 @@ const ANNOTATED_MOCKUP_PROMPT = [
   'Keep labels legible and sparse. The result should look like a painter marked up a planning print before starting a painting.'
 ].join(' ');
 
+const IN_PROCESS_PROMPT = [
+  'You are a candid watercolor studio mentor reviewing a work-in-progress painting photo.',
+  'This is In-Process Mode. The first image is always the current WIP painting and is sufficient by itself.',
+  'A reference photo and/or annotated mockup may follow as optional context only; do not require them and do not critique them as the main image.',
+  'Use optional context to understand intent, motif, or planned structure, then judge the WIP on its own painting terms.',
+  'Focus on what is working, what to adjust next, value structure, edge control, focal hierarchy, overworked areas,',
+  'lost-and-found edges, and the next 3 to 5 concrete painting actions.',
+  'Keep guidance selective, repaintable, and aware of wet media limits. Preserve freshness and useful ambiguity.',
+  'Avoid generic praise, global redesign, photoreal correction, image-generation language, and advice that depends on unavailable reference material.',
+  'Return JSON only, in the requested field order. Each field should be concise but actionable in the studio.'
+].join(' ');
+
 const server = http.createServer(async (req, res) => {
   let isApiRequest = false;
 
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    isApiRequest = url.pathname === '/api/semantic' || url.pathname === '/api/mockup';
+    isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process'].includes(url.pathname);
 
     if (isApiRequest && req.method === 'OPTIONS') {
       sendApiPreflight(req, res);
@@ -164,6 +176,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/mockup') {
       await handleMockup(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/in-process') {
+      await handleInProcess(req, res);
       return;
     }
 
@@ -243,6 +260,49 @@ async function handleMockup(req, res) {
   sendApiJson(req, res, 200, mockup);
 }
 
+async function handleInProcess(req, res) {
+  console.log('APS proxy: in-process request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const wipImage = typeof body.wipImage === 'string' ? body.wipImage.trim() : '';
+  const wipMimeType = typeof body.wipMimeType === 'string' ? body.wipMimeType : '';
+  const referenceImage = typeof body.referenceImage === 'string' ? body.referenceImage.trim() : '';
+  const referenceMimeType = typeof body.referenceMimeType === 'string' ? body.referenceMimeType : '';
+  const mockupImage = typeof body.mockupImage === 'string' ? body.mockupImage.trim() : '';
+  const mockupMimeType = typeof body.mockupMimeType === 'string' ? body.mockupMimeType : '';
+
+  if (!wipImage || !isSupportedImageMimeType(wipMimeType)) {
+    sendApiJson(req, res, 400, { error: 'invalid_wip_image' });
+    return;
+  }
+
+  if ((referenceImage && !isSupportedImageMimeType(referenceMimeType)) ||
+      (mockupImage && !isSupportedImageMimeType(mockupMimeType))) {
+    sendApiJson(req, res, 400, { error: 'invalid_context_image' });
+    return;
+  }
+
+  const critique = await callGeminiInProcessPass({
+    wipImage,
+    wipMimeType,
+    referenceImage,
+    referenceMimeType,
+    mockupImage,
+    mockupMimeType
+  });
+  console.log('APS proxy: in-process critique object created');
+  sendApiJson(req, res, 200, critique);
+}
+
 async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
   const prompt = promptForWorkflow(workflowMode);
   const schema = schemaForWorkflow(workflowMode);
@@ -297,6 +357,82 @@ async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
   const parsed = parseSemanticJson(text);
   console.log('APS proxy: parse completed');
   return normalizeSemanticResponse(parsed, workflowMode);
+}
+
+async function callGeminiInProcessPass(context) {
+  const parts = [
+    { text: buildInProcessPrompt(context) },
+    { text: 'WIP painting image:' },
+    {
+      inline_data: {
+        mime_type: context.wipMimeType,
+        data: context.wipImage
+      }
+    }
+  ];
+
+  if (context.referenceImage) {
+    parts.push(
+      { text: 'Optional reference context image:' },
+      {
+        inline_data: {
+          mime_type: context.referenceMimeType,
+          data: context.referenceImage
+        }
+      }
+    );
+  }
+
+  if (context.mockupImage) {
+    parts.push(
+      { text: 'Optional annotated mockup context image:' },
+      {
+        inline_data: {
+          mime_type: context.mockupMimeType,
+          data: context.mockupImage
+        }
+      }
+    );
+  }
+
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          response_schema: SEMANTIC_SCHEMA,
+          temperature: 0.2,
+          max_output_tokens: 2400
+        }
+      })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || `Gemini returned ${response.status}`;
+    throw new Error(message);
+  }
+
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map(part => part.text || '')
+    .join('')
+    .trim();
+
+  if (!text) {
+    throw new Error('Gemini returned no in-process JSON');
+  }
+
+  console.log(`APS proxy: Gemini in-process response received: ${previewText(text)}`);
+  const parsed = parseSemanticJson(text);
+  return normalizeSemanticResponse(parsed, WORKFLOW_MODES.IN_PROGRESS_GUIDANCE);
 }
 
 async function callGeminiMockupPass(imageBase64, mimeType, ideation) {
@@ -372,6 +508,27 @@ function buildAnnotatedMockupPrompt(ideation) {
   ].join('\n');
 }
 
+function buildInProcessPrompt(context) {
+  const contextLine = [
+    context.referenceImage ? 'reference photo available' : 'no reference photo supplied',
+    context.mockupImage ? 'annotated mockup available' : 'no annotated mockup supplied'
+  ].join('; ');
+
+  return [
+    IN_PROCESS_PROMPT,
+    '',
+    `Context: ${contextLine}.`,
+    'For priorityDiagnosis, name the single most useful WIP lesson.',
+    'For sceneRead, describe what the current painting reads as, including uncertainty if needed.',
+    'For valueStructureCritique, explain the biggest value grouping issue or strength.',
+    'For edgeAtmosphereCritique, include edge control, lost-and-found edges, and overworked or too-equal passages.',
+    'For interventionScope, define the narrow area or relationship to adjust next.',
+    'For demonstrationDescription, describe the kind of small study mark or mental overlay that would clarify the correction.',
+    'For repaintHandoff, give 3 to 5 ordered next painting actions in one compact paragraph.',
+    'For preserve and avoid, be specific about what should stay fresh and what action would make the WIP worse.'
+  ].join('\n');
+}
+
 function summarizeIdeationForMockup(ideation) {
   const fields = [
     ['Dominant read', ideation.dominantRead],
@@ -442,6 +599,10 @@ function normalizeWorkflowMode(value) {
   return Object.values(WORKFLOW_MODES).includes(value)
     ? value
     : WORKFLOW_MODES.IN_PROGRESS_GUIDANCE;
+}
+
+function isSupportedImageMimeType(mimeType) {
+  return ['image/jpeg', 'image/png', 'image/webp'].includes(mimeType);
 }
 
 function promptForWorkflow(workflowMode) {
