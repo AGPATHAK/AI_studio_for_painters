@@ -1,8 +1,7 @@
 /* ==========================================================================
    AI Painter Studio — app.js
-   Minimal critique loop prototype: upload, one value diagnosis,
-   one semantic scene read, one quiet scope overlay, one demonstration,
-   one repaint handoff.
+   AI-assisted painter workflow prototype: upload, analyze with Gemini,
+   render critique or ideation, and generate annotated mockups.
    ========================================================================== */
 
 'use strict';
@@ -56,8 +55,7 @@ const appState = {
     error: ''
   },
   displayMode: 'original', // original | mockup
-  semanticRequestId: 0,
-  critiqueStep: 'idle'  // idle | diagnosis | scope | demo | repaint
+  semanticRequestId: 0
 };
 
 /* ── DOM refs ─────────────────────────────────────────────────────────────── */
@@ -101,15 +99,6 @@ const aiAvoidItem = document.getElementById('ai-avoid-item');
 const aiAvoid = document.getElementById('ai-avoid');
 const aiUncertaintyItem = document.getElementById('ai-uncertainty-item');
 const aiUncertainty = document.getElementById('ai-uncertainty');
-const semanticSection = document.getElementById('semantic-section');
-const semanticCopy    = document.getElementById('semantic-copy');
-const scopeSection    = document.getElementById('scope-section');
-const scopeCopy       = document.getElementById('scope-copy');
-const demoSection     = document.getElementById('demo-section');
-const demoCopy        = document.getElementById('demo-copy');
-const repaintSection  = document.getElementById('repaint-section');
-const repaintList     = document.getElementById('repaint-list');
-const nextStepBtn     = document.getElementById('next-step-btn');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
@@ -124,9 +113,7 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !aiEdgeCritique || !aiScopeItem || !aiScope || !aiDemoItem ||
     !aiDemo || !aiRepaintItem || !aiRepaint || !aiPreserveItem ||
     !aiPreserve || !aiAvoidItem || !aiAvoid || !aiUncertaintyItem ||
-    !aiUncertainty || !semanticSection || !semanticCopy ||
-    !scopeSection || !scopeCopy || !demoSection || !demoCopy ||
-    !repaintSection || !repaintList || !nextStepBtn) {
+    !aiUncertainty) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -809,14 +796,6 @@ function getRegionReadout() {
     .join('; ');
 }
 
-function refreshSemanticCopy() {
-  if (!appState.semantic) {
-    semanticCopy.textContent = 'Scene labels will be used only to ground the value critique.';
-    return;
-  }
-  semanticCopy.textContent = `Major regions: ${getRegionReadout()}.`;
-}
-
 function refreshSemanticSource() {
   const status = appState.semanticStatus;
   const copy = getWorkflowCopy();
@@ -842,10 +821,10 @@ function refreshSemanticSource() {
   }
 }
 
-function refreshCritiqueCopy(step) {
+function refreshCritiqueCopy() {
   refreshWorkflowChrome();
   if (isReferenceIdeationMode()) {
-    refreshReferenceIdeationCopy(step);
+    refreshReferenceIdeationCopy();
     return;
   }
 
@@ -858,49 +837,6 @@ function refreshCritiqueCopy(step) {
     refreshFinishedCopy();
     return;
   }
-
-  if (hasAiNativeCritique()) {
-    refreshAiCritiqueCopy();
-    return;
-  }
-
-  const semantic = appState.semantic || getFallbackSemanticInterpretation(getActiveImageState().bitmap);
-  const family = getTargetValueFamily();
-  const protectedPassages = getProtectedPassages();
-  const familyLabel = semantic.critiqueTarget || family.label;
-  const familyPosition = family.position;
-  const primaryIssue = semantic.primaryIssue || `The dominant shadow structure fragments through the ${familyLabel}, weakening the painting's value cohesion.`;
-  const repaintFirstAction = semantic.repaintFirstAction || `Rebuild the ${familyLabel} as one connected value family.`;
-  const repaintCaution = semantic.repaintCaution || 'Add accents only after the large shadow mass reads clearly.';
-
-  scopeCopy.textContent = `${familyLabel}, in the ${familyPosition}. ${protectedPassages} stay untouched.`;
-  demoCopy.textContent = `A quiet value grouping pass shows how the ${familyLabel} can behave as one calmer mass.`;
-
-  repaintList.replaceChildren(
-    makeListItem(repaintFirstAction),
-    makeListItem(`Preserve the ${protectedPassages}.`),
-    makeListItem(repaintCaution)
-  );
-
-  if (step === 'idle') {
-    const copy = getWorkflowCopy();
-    critiqueMessage.textContent = getActiveImageState().bitmap
-      ? copy.ready
-      : copy.empty;
-    nextStepBtn.textContent = copy.action;
-  } else if (step === 'diagnosis') {
-    critiqueMessage.textContent = primaryIssue;
-    nextStepBtn.textContent = 'Reveal scope';
-  } else if (step === 'scope') {
-    critiqueMessage.textContent = `One regional intervention is proposed: group the ${familyLabel} while preserving the main light and outer passages.`;
-    nextStepBtn.textContent = 'Show demonstration';
-  } else if (step === 'demo') {
-    critiqueMessage.textContent = `The demonstration quietly groups the ${familyPosition} values. It is a study aid, not a finished correction.`;
-    nextStepBtn.textContent = 'Repaint guidance';
-  } else if (step === 'repaint') {
-    critiqueMessage.textContent = `Return to the painting with one task: ${trimTerminalPunctuation(lowercaseFirst(repaintFirstAction))}.`;
-    nextStepBtn.textContent = 'Repaint next';
-  }
 }
 
 function refreshInProcessCopy() {
@@ -911,14 +847,12 @@ function refreshInProcessCopy() {
   if (!hasWip) {
     critiqueMessage.textContent = copy.empty;
     aiCritiqueSection.hidden = true;
-    nextStepBtn.hidden = true;
     return;
   }
 
   if (status.state === 'loading') {
     critiqueMessage.textContent = 'Asking Gemini to critique this WIP image...';
     aiCritiqueSection.hidden = true;
-    nextStepBtn.hidden = true;
     return;
   }
 
@@ -931,7 +865,6 @@ function refreshInProcessCopy() {
     ? 'Gemini critique did not complete. The WIP image is loaded, but no AI guidance was generated.'
     : copy.ready;
   aiCritiqueSection.hidden = true;
-  nextStepBtn.hidden = true;
 }
 
 function hasInProcessCritique() {
@@ -953,14 +886,12 @@ function refreshFinishedCopy() {
   if (!hasFinished) {
     critiqueMessage.textContent = copy.empty;
     aiCritiqueSection.hidden = true;
-    nextStepBtn.hidden = true;
     return;
   }
 
   if (status.state === 'loading') {
     critiqueMessage.textContent = 'Asking Gemini for a finished painting critique...';
     aiCritiqueSection.hidden = true;
-    nextStepBtn.hidden = true;
     return;
   }
 
@@ -973,7 +904,6 @@ function refreshFinishedCopy() {
     ? 'Gemini critique did not complete. The finished painting is loaded, but no final critique was generated.'
     : copy.ready;
   aiCritiqueSection.hidden = true;
-  nextStepBtn.hidden = true;
 }
 
 function hasFinishedCritique() {
@@ -998,11 +928,10 @@ function refreshWorkflowChrome() {
   critiqueBtn.textContent = isReferenceIdeationMode() ? 'Idea' : 'Crit';
 }
 
-function refreshReferenceIdeationCopy(step) {
+function refreshReferenceIdeationCopy() {
   if (!appState.image.bitmap) {
     critiqueMessage.textContent = getWorkflowCopy().empty;
     aiCritiqueSection.hidden = true;
-    nextStepBtn.hidden = true;
     refreshMockupUi();
     return;
   }
@@ -1052,13 +981,7 @@ function refreshReferenceIdeationCopy(step) {
   setAiItem(aiAvoidItem, aiAvoid, ideation.suppress || ideation.avoid);
   setAiItem(aiUncertaintyItem, aiUncertainty, ideation.uncertaintyNote);
 
-  nextStepBtn.hidden = true;
   refreshMockupUi();
-}
-
-function hasAiNativeCritique() {
-  return appState.semanticStatus.source === 'gemini' &&
-    !!appState.semantic?.priorityDiagnosis;
 }
 
 function refreshAiCritiqueCopy() {
@@ -1108,21 +1031,6 @@ function setAiItem(container, copy, text) {
   const cleaned = String(text || '').trim();
   copy.textContent = cleaned;
   container.hidden = !cleaned;
-}
-
-function makeListItem(text) {
-  const item = document.createElement('li');
-  item.textContent = text;
-  return item;
-}
-
-function lowercaseFirst(text) {
-  if (!text) return text;
-  return text.charAt(0).toLowerCase() + text.slice(1);
-}
-
-function trimTerminalPunctuation(text) {
-  return String(text || '').replace(/[.!?]\s*$/, '');
 }
 
 function resetMockup() {
@@ -1289,9 +1197,8 @@ async function imageBitmapFromDataUrl(dataUrl) {
  * Render an ImageBitmap into the canvas, filling the container while
  * preserving the source aspect ratio.  Never upscales beyond 1:1.
  * @param {ImageBitmap} bitmap
- * @param {Object} options
  */
-function renderCanvas(bitmap, options = {}) {
+function renderCanvas(bitmap) {
   if (!bitmap) return;
 
   const container = canvas.parentElement;
@@ -1310,81 +1217,13 @@ function renderCanvas(bitmap, options = {}) {
 
   ctx.clearRect(0, 0, drawW, drawH);
   ctx.drawImage(bitmap, 0, 0, drawW, drawH);
-
-  if (!options.allowCritiqueOverlays || isInProcessMode() || isFinishedMode()) return;
-
-  if (appState.critiqueStep === 'scope') {
-    drawScopeOverlay();
-  } else if (appState.critiqueStep === 'demo' ||
-             appState.critiqueStep === 'repaint') {
-    drawDemonstrationOverlay();
-  }
 }
 
 function renderCurrentDisplay() {
   const bitmap = getDisplayBitmap();
   if (!bitmap) return;
 
-  renderCanvas(bitmap, {
-    allowCritiqueOverlays: appState.displayMode === 'original'
-  });
-}
-
-function getCritiqueRegion() {
-  return {
-    x: Math.round(canvas.width * 0.18),
-    y: Math.round(canvas.height * 0.48),
-    w: Math.round(canvas.width * 0.64),
-    h: Math.round(canvas.height * 0.22)
-  };
-}
-
-function drawRoundedRegion(region, radius) {
-  const r = Math.min(radius, region.w / 2, region.h / 2);
-  ctx.beginPath();
-  ctx.moveTo(region.x + r, region.y);
-  ctx.lineTo(region.x + region.w - r, region.y);
-  ctx.quadraticCurveTo(region.x + region.w, region.y, region.x + region.w, region.y + r);
-  ctx.lineTo(region.x + region.w, region.y + region.h - r);
-  ctx.quadraticCurveTo(region.x + region.w, region.y + region.h, region.x + region.w - r, region.y + region.h);
-  ctx.lineTo(region.x + r, region.y + region.h);
-  ctx.quadraticCurveTo(region.x, region.y + region.h, region.x, region.y + region.h - r);
-  ctx.lineTo(region.x, region.y + r);
-  ctx.quadraticCurveTo(region.x, region.y, region.x + r, region.y);
-  ctx.closePath();
-}
-
-function drawScopeOverlay() {
-  const region = getCritiqueRegion();
-  ctx.save();
-  drawRoundedRegion(region, 18);
-  ctx.fillStyle = 'rgba(124, 92, 74, 0.10)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(124, 92, 74, 0.55)';
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 8]);
-  ctx.stroke();
-  ctx.restore();
-}
-
-function drawDemonstrationOverlay() {
-  const region = getCritiqueRegion();
-  ctx.save();
-  drawRoundedRegion(region, 18);
-  ctx.clip();
-  ctx.fillStyle = 'rgba(62, 55, 48, 0.18)';
-  ctx.fillRect(region.x, region.y, region.w, region.h);
-  ctx.globalCompositeOperation = 'multiply';
-  ctx.fillStyle = 'rgba(118, 100, 82, 0.18)';
-  ctx.fillRect(region.x, region.y, region.w, region.h);
-  ctx.restore();
-
-  ctx.save();
-  drawRoundedRegion(region, 18);
-  ctx.strokeStyle = 'rgba(124, 92, 74, 0.38)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.restore();
+  renderCanvas(bitmap);
 }
 
 /* ── View helpers ─────────────────────────────────────────────────────────── */
@@ -1394,7 +1233,6 @@ function showCanvas() {
   emptyState.hidden   = true;
   resetBtn.disabled   = false;
   critiqueBtn.disabled = false;
-  nextStepBtn.disabled = false;
   refreshCanvasToggle();
   refreshWorkflowChrome();
 }
@@ -1405,57 +1243,26 @@ function showEmptyState() {
   canvasToggle.hidden = true;
   resetBtn.disabled   = true;
   critiqueBtn.disabled = true;
-  nextStepBtn.disabled = true;
   canvas.width        = 0;
   canvas.height       = 0;
-  setCritiqueStep('idle');
+  refreshCritiquePanel('empty');
 }
 
-function setCritiqueStep(step) {
-  console.log(`APS: critique render trigger: ${step}`);
-  appState.critiqueStep = step;
+function refreshCritiquePanel(reason) {
+  console.log(`APS: critique render trigger: ${reason}`);
 
-  const useAiCritique = isReferenceIdeationMode() || isInProcessMode() ||
-    isFinishedMode() || hasAiNativeCritique();
-  aiCritiqueSection.hidden = !useAiCritique;
-  semanticSection.hidden = useAiCritique || !(step === 'diagnosis' || step === 'scope' ||
-                                              step === 'demo' || step === 'repaint');
-  scopeSection.hidden = useAiCritique || !(step === 'scope' || step === 'demo' || step === 'repaint');
-  demoSection.hidden = useAiCritique || !(step === 'demo' || step === 'repaint');
-  repaintSection.hidden = useAiCritique || (step !== 'repaint');
-
-  critiquePanel.dataset.step = step;
-
-  refreshSemanticCopy();
   refreshSemanticSource();
-  refreshCritiqueCopy(step);
+  refreshCritiqueCopy();
   refreshMockupUi();
 
-  nextStepBtn.hidden = useAiCritique;
-  nextStepBtn.disabled = !getActiveImageState().bitmap || step === 'repaint';
-
   renderCurrentDisplay();
-  console.log(`APS: critique render complete: ${step}${useAiCritique ? ' (Gemini)' : ' (fallback)'}`);
-}
-
-function advanceCritiqueLoop() {
-  if (!getActiveImageState().bitmap) return;
-
-  if (appState.critiqueStep === 'idle') {
-    setCritiqueStep('diagnosis');
-  } else if (appState.critiqueStep === 'diagnosis') {
-    setCritiqueStep('scope');
-  } else if (appState.critiqueStep === 'scope') {
-    setCritiqueStep('demo');
-  } else if (appState.critiqueStep === 'demo') {
-    setCritiqueStep('repaint');
-  }
+  console.log(`APS: critique render complete: ${reason}`);
 }
 
 async function rerunWorkflowAnalysis() {
   const activeImage = getActiveImageState();
   if (!activeImage.bitmap || !activeImage.file) {
-    setCritiqueStep(activeImage.bitmap ? 'diagnosis' : 'idle');
+    refreshCritiquePanel(activeImage.bitmap ? 'loaded' : 'empty');
     return;
   }
 
@@ -1473,9 +1280,8 @@ async function rerunWorkflowAnalysis() {
         ? 'Semantic source: asking Gemini for finished critique'
         : 'Semantic source: asking Gemini Vision')
   };
-  appState.critiqueStep = 'idle';
   if (isReferenceIdeationMode()) resetMockup();
-  setCritiqueStep('idle');
+  refreshCritiquePanel('loading');
 
   const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
   if (requestId !== appState.semanticRequestId || bitmap !== getActiveImageState().bitmap) {
@@ -1485,7 +1291,7 @@ async function rerunWorkflowAnalysis() {
 
   appState.semantic = semanticResult.semantic;
   appState.semanticStatus = semanticResult.status;
-  setCritiqueStep('diagnosis');
+  refreshCritiquePanel('analysis-ready');
 }
 
 /* ── File upload ──────────────────────────────────────────────────────────── */
@@ -1530,7 +1336,6 @@ fileInput.addEventListener('change', async () => {
     activeImage.file     = file;
     appState.semantic       = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
-    appState.critiqueStep   = 'idle';
     if (supportsAnnotatedMockup()) resetMockup();
 
     showCanvas();
@@ -1538,7 +1343,7 @@ fileInput.addEventListener('change', async () => {
     console.log(`APS: upload complete #${requestId}`);
 
     if (isInProcessMode() || isFinishedMode()) {
-      setCritiqueStep('idle');
+      refreshCritiquePanel('loaded');
       fileInput.value = '';
       return;
     }
@@ -1553,7 +1358,7 @@ fileInput.addEventListener('change', async () => {
     appState.semanticStatus = semanticResult.status;
 
     console.log(`APS: critique render trigger from semantic completion #${requestId}`);
-    setCritiqueStep('diagnosis');
+    refreshCritiquePanel('analysis-ready');
 
   } catch (err) {
     console.error('APS: failed to decode image:', err);
@@ -1568,7 +1373,6 @@ fileInput.addEventListener('change', async () => {
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.semanticRequestId += 1;
-    appState.critiqueStep = 'idle';
     if (supportsAnnotatedMockup()) resetMockup();
     showEmptyState();
   }
@@ -1597,7 +1401,6 @@ resetBtn.addEventListener('click', () => {
   appState.semantic = null;
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.semanticRequestId += 1;
-  appState.critiqueStep = 'idle';
   if (supportsAnnotatedMockup()) resetMockup();
   showEmptyState();
 });
@@ -1606,8 +1409,6 @@ critiqueBtn.addEventListener('click', () => {
   if (!getActiveImageState().bitmap) return;
   rerunWorkflowAnalysis();
 });
-
-nextStepBtn.addEventListener('click', advanceCritiqueLoop);
 
 workflowModeSelect.addEventListener('change', () => {
   appState.workflowMode = workflowModeSelect.value;

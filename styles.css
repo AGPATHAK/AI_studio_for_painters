@@ -298,7 +298,7 @@ body.transitions-ready {
   user-select: none;
 }
 
-/* ── Minimal critique loop panel ─────────────────────────────────────────── */
+/* ── AI critique panel ───────────────────────────────────────────────────── */
 .critique-panel {
   border-left: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-bg) 84%, var(--color-surface));
@@ -348,8 +348,7 @@ body.transitions-ready {
   outline-offset: 2px;
 }
 
-.panel-copy,
-.panel-section {
+.panel-copy {
   color: var(--color-text);
   font-size: 0.88rem;
   line-height: 1.55;
@@ -434,23 +433,6 @@ body.transitions-ready {
   margin-top: 4px;
 }
 
-.panel-section {
-  border-top: 1px solid var(--color-border);
-  padding-top: 13px;
-}
-
-.panel-section[hidden] {
-  display: none;
-}
-
-.repaint-list {
-  padding-left: 18px;
-}
-
-.repaint-list li + li {
-  margin-top: 8px;
-}
-
 .btn-panel {
   margin-top: auto;
   min-height: 38px;
@@ -475,30 +457,6 @@ body.transitions-ready {
 
 #mockup-btn {
   margin-top: 0;
-}
-
-.critique-panel[data-step="diagnosis"] .panel-title::after {
-  content: " · diagnosis";
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.critique-panel[data-step="scope"] .panel-title::after {
-  content: " · scope";
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.critique-panel[data-step="demo"] .panel-title::after {
-  content: " · demonstration";
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-
-.critique-panel[data-step="repaint"] .panel-title::after {
-  content: " · repaint";
-  color: var(--color-text-muted);
-  font-weight: 500;
 }
 
 .critique-panel[data-workflow="reference-ideation"] .panel-title::after {
