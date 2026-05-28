@@ -931,19 +931,29 @@ function resetMockup() {
   renderCurrentDisplay();
 }
 
+function supportsAnnotatedMockup() {
+  return isReferenceIdeationMode() || isInProcessMode();
+}
+
 function canGenerateMockup() {
-  return isReferenceIdeationMode() &&
-    !!appState.image.bitmap &&
-    !!appState.semantic &&
-    appState.mockup.status !== 'loading';
+  if (!supportsAnnotatedMockup() || appState.mockup.status === 'loading') {
+    return false;
+  }
+
+  if (isReferenceIdeationMode()) {
+    return !!appState.image.bitmap && !!appState.semantic;
+  }
+
+  return !!appState.wipImage.bitmap;
 }
 
 function refreshMockupUi() {
-  mockupBtn.hidden = !isReferenceIdeationMode();
+  mockupBtn.hidden = !supportsAnnotatedMockup();
   mockupBtn.disabled = !canGenerateMockup();
 
   const mockup = appState.mockup;
-  const shouldShow = isReferenceIdeationMode() &&
+  const shouldShow = supportsAnnotatedMockup() &&
+    !!getActiveImageState().bitmap &&
     (mockup.status !== 'idle' || !!mockup.imageDataUrl);
   mockupSection.hidden = !shouldShow;
   mockupImage.hidden = !mockup.imageDataUrl;
@@ -970,7 +980,7 @@ function refreshMockupUi() {
 
 function refreshCanvasToggle() {
   const hasOriginal = !!getActiveImageState().bitmap;
-  const hasMockup = isReferenceIdeationMode() && !!appState.mockup.bitmap;
+  const hasMockup = supportsAnnotatedMockup() && !!appState.mockup.bitmap;
 
   canvasToggle.hidden = !hasOriginal;
   showOriginalBtn.disabled = !hasOriginal;
@@ -987,14 +997,15 @@ function setDisplayMode(mode) {
 }
 
 function getDisplayBitmap() {
-  if (isReferenceIdeationMode() && appState.displayMode === 'mockup' && appState.mockup.bitmap) {
+  if (supportsAnnotatedMockup() && appState.displayMode === 'mockup' && appState.mockup.bitmap) {
     return appState.mockup.bitmap;
   }
   return getActiveImageState().bitmap;
 }
 
 async function requestAnnotatedMockup() {
-  if (!appState.image.file || !isReferenceIdeationMode()) return;
+  const sourceImage = getActiveImageState();
+  if (!sourceImage.file || !supportsAnnotatedMockup()) return;
 
   if (appState.mockup.bitmap) {
     appState.mockup.bitmap.close();
@@ -1012,17 +1023,17 @@ async function requestAnnotatedMockup() {
   renderCurrentDisplay();
 
   try {
-    const imageData = await fileToBase64(appState.image.file);
+    const imageData = await fileToBase64(sourceImage.file);
     const response = await fetch(getMockupEndpoint(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         image: imageData,
-        mimeType: appState.image.file.type,
-        filename: appState.image.filename,
+        mimeType: sourceImage.file.type,
+        filename: sourceImage.filename,
         workflowMode: getWorkflowMode(),
         mode: 'annotated_mockup',
-        ideation: appState.semantic || getFallbackSemanticInterpretation(appState.image.bitmap)
+        ideation: appState.semantic || getFallbackSemanticInterpretation(sourceImage.bitmap)
       })
     });
 
@@ -1370,7 +1381,7 @@ resetBtn.addEventListener('click', () => {
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.semanticRequestId += 1;
   appState.critiqueStep = 'idle';
-  if (isReferenceIdeationMode()) resetMockup();
+  if (supportsAnnotatedMockup()) resetMockup();
   showEmptyState();
 });
 
