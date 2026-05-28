@@ -15,36 +15,46 @@
 
   <header class="app-header">
     <h1 class="app-title">AI Painter Studio</h1>
+    <button class="btn btn-icon" id="theme-btn"
+            title="Toggle light / dark theme"
+            aria-label="Toggle theme">
+      <!-- icon set by applyTheme() in app.js -->
+    </button>
   </header>
 
   <div class="app-layout">
 
-    <nav class="controls-rail" aria-label="Tools">
-      <!-- Hidden file input — triggered by Upload button -->
+    <!-- Left panel: workflow selection + all actions -->
+    <nav class="left-panel" aria-label="Workflow and tools">
       <input type="file" id="file-input" accept="image/jpeg,image/png"
              aria-hidden="true" tabindex="-1">
 
-      <button class="btn btn-primary" id="upload-btn">
-        Upload
-      </button>
+      <div class="left-panel-section">
+        <label class="field-label" for="workflow-mode">Workflow</label>
+        <select id="workflow-mode" class="mode-select">
+          <option value="reference-ideation">Reference Ideation</option>
+          <option value="in-progress-guidance">In-Process</option>
+          <option value="finished-review">Finished Painting</option>
+        </select>
+      </div>
 
-      <button class="btn" id="reset-btn" disabled>
-        Reset
-      </button>
-
-      <button class="btn" id="critique-btn" disabled>
-        Crit
-      </button>
-
-      <hr class="rail-divider" aria-hidden="true">
-
-      <button class="btn btn-icon" id="theme-btn"
-              title="Toggle light / dark theme"
-              aria-label="Toggle theme">
-        <!-- icon set by applyTheme() in app.js -->
-      </button>
+      <div class="left-panel-section">
+        <button class="btn btn-primary btn-full" id="upload-btn">
+          Upload Reference
+        </button>
+        <button class="btn btn-full" id="critique-btn" disabled>
+          Run Ideation
+        </button>
+        <button class="btn btn-full btn-generate" id="mockup-btn" disabled>
+          Generate Mockup
+        </button>
+        <button class="btn btn-full" id="reset-btn" disabled>
+          Reset
+        </button>
+      </div>
     </nav>
 
+    <!-- Centre: canvas display -->
     <main class="studio-stage" aria-label="Critique workspace">
       <section class="canvas-area" aria-label="Image canvas">
         <div class="canvas-toggle" id="canvas-toggle" hidden aria-label="Displayed image">
@@ -64,81 +74,69 @@
           Load a JPG or PNG to begin
         </p>
       </section>
-
-      <aside class="critique-panel" id="critique-panel" aria-live="polite">
-        <label class="mode-control" for="workflow-mode">
-          <span class="section-label">Workflow</span>
-          <select id="workflow-mode" class="mode-select">
-            <option value="reference-ideation">Reference Ideation</option>
-            <option value="in-progress-guidance">In-Process</option>
-            <option value="finished-review">Finished Painting</option>
-          </select>
-        </label>
-
-        <p class="panel-kicker">Value structure</p>
-        <h2 class="panel-title">One visual lesson</h2>
-        <p class="panel-copy" id="critique-message">
-          Upload a reference photograph to explore painterly possibilities.
-        </p>
-
-        <p class="semantic-source" id="semantic-source" hidden>
-          Semantic source: waiting for image
-        </p>
-
-        <button class="btn-panel" id="mockup-btn" disabled>
-          Generate Annotated Mockup
-        </button>
-
-        <div class="mockup-section" id="mockup-section" hidden>
-          <p class="section-label">Annotated mockup</p>
-          <p class="mockup-status" id="mockup-status">Waiting for mockup.</p>
-          <img id="mockup-image" alt="AI-generated annotated painterly mockup" hidden>
-          <a class="mockup-download" id="mockup-download" download="ai-painter-annotated-mockup.png" hidden>
-            Download mockup
-          </a>
-        </div>
-
-        <div class="ai-critique-section" id="ai-critique-section" hidden>
-          <div class="ai-critique-item" id="ai-scene-item">
-            <p class="section-label">Scene read</p>
-            <p id="ai-scene-read"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-value-item">
-            <p class="section-label">Value structure</p>
-            <p id="ai-value-critique"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-edge-item">
-            <p class="section-label">Edges and atmosphere</p>
-            <p id="ai-edge-critique"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-scope-item">
-            <p class="section-label">Scope</p>
-            <p id="ai-scope"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-demo-item">
-            <p class="section-label">Demonstration</p>
-            <p id="ai-demo"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-repaint-item">
-            <p class="section-label">Repaint handoff</p>
-            <p id="ai-repaint"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-preserve-item">
-            <p class="section-label">Preserve</p>
-            <p id="ai-preserve"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-avoid-item">
-            <p class="section-label">Avoid</p>
-            <p id="ai-avoid"></p>
-          </div>
-          <div class="ai-critique-item" id="ai-uncertainty-item" hidden>
-            <p class="section-label">Uncertainty</p>
-            <p id="ai-uncertainty"></p>
-          </div>
-        </div>
-
-      </aside>
     </main>
+
+    <!-- Right panel: Gemini critique and commentary -->
+    <aside class="critique-panel" id="critique-panel" aria-live="polite">
+      <p class="panel-kicker">Value structure</p>
+      <h2 class="panel-title">One visual lesson</h2>
+      <p class="panel-copy" id="critique-message">
+        Upload a reference photograph to explore painterly possibilities.
+      </p>
+
+      <p class="semantic-source" id="semantic-source" hidden>
+        Semantic source: waiting for image
+      </p>
+
+      <div class="mockup-section" id="mockup-section" hidden>
+        <p class="section-label">Annotated mockup</p>
+        <p class="mockup-status" id="mockup-status">Waiting for mockup.</p>
+        <img id="mockup-image" alt="AI-generated annotated painterly mockup" hidden>
+        <a class="mockup-download" id="mockup-download" download="ai-painter-annotated-mockup.png" hidden>
+          Download mockup
+        </a>
+      </div>
+
+      <div class="ai-critique-section" id="ai-critique-section" hidden>
+        <div class="ai-critique-item" id="ai-scene-item">
+          <p class="section-label">Scene read</p>
+          <p id="ai-scene-read"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-value-item">
+          <p class="section-label">Value structure</p>
+          <p id="ai-value-critique"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-edge-item">
+          <p class="section-label">Edges and atmosphere</p>
+          <p id="ai-edge-critique"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-scope-item">
+          <p class="section-label">Scope</p>
+          <p id="ai-scope"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-demo-item">
+          <p class="section-label">Demonstration</p>
+          <p id="ai-demo"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-repaint-item">
+          <p class="section-label">Repaint handoff</p>
+          <p id="ai-repaint"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-preserve-item">
+          <p class="section-label">Preserve</p>
+          <p id="ai-preserve"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-avoid-item">
+          <p class="section-label">Avoid</p>
+          <p id="ai-avoid"></p>
+        </div>
+        <div class="ai-critique-item" id="ai-uncertainty-item" hidden>
+          <p class="section-label">Uncertainty</p>
+          <p id="ai-uncertainty"></p>
+        </div>
+      </div>
+
+    </aside>
 
   </div><!-- /.app-layout -->
 

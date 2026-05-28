@@ -8,7 +8,7 @@
 :root {
   /* Backgrounds */
   --color-bg:          #f4f1ed;   /* warm off-white — like primed linen */
-  --color-surface:     #ece8e2;   /* slightly darker — header, rail */
+  --color-surface:     #ece8e2;   /* slightly darker — header, left panel */
   --color-surface-2:   #e2ddd6;   /* hover / pressed states */
   --color-border:      #cec7bd;   /* subtle rule */
 
@@ -22,9 +22,9 @@
   --color-accent-text: #f4f1ed;   /* text on accent bg */
 
   /* Layout */
-  --header-height: 48px;
-  --rail-width:    68px;
-  --panel-width:   320px;
+  --header-height:    48px;
+  --left-panel-width: 200px;
+  --panel-width:      300px;
 
   /* Typography */
   --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
@@ -64,7 +64,6 @@ body {
   font-size: 14px;
   background: var(--color-bg);
   color: var(--color-text);
-  /* Apply transition after first paint (class added by JS to avoid FOUC) */
 }
 
 body.transitions-ready {
@@ -84,9 +83,11 @@ body.transitions-ready {
   display: flex;
   align-items: center;
   padding: 0 16px;
+  gap: 12px;
 }
 
 .app-title {
+  flex: 1;
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -101,30 +102,43 @@ body.transitions-ready {
   padding-top: var(--header-height);
 }
 
-/* ── Controls rail ───────────────────────────────────────────────────────── */
-.controls-rail {
+/* ── Left panel ───────────────────────────────────────────────────────────── */
+.left-panel {
   flex-shrink: 0;
-  width: var(--rail-width);
+  width: var(--left-panel-width);
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 12px 0;
-  gap: 6px;
+  padding: 16px 12px 16px;
   overflow: hidden;
 }
 
-/* Hide the native file input completely */
-.controls-rail input[type="file"] {
+.left-panel input[type="file"] {
   display: none;
 }
 
-.rail-divider {
-  width: 36px;
-  border: none;
-  border-top: 1px solid var(--color-border);
-  margin: 6px 0;
+.left-panel-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.left-panel-section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.field-label {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
@@ -183,9 +197,7 @@ body.transitions-ready {
   background: var(--color-accent-hover);
 }
 
-/* Icon — borderless, SVG face.
-   color is set explicitly so SVG stroke="currentColor" resolves correctly
-   in both themes without relying on inheritance from .btn. */
+/* Icon — borderless, SVG face */
 .btn-icon {
   font-size: 1rem;
   border-color: transparent;
@@ -194,7 +206,6 @@ body.transitions-ready {
   width: 40px;
   height: 40px;
   border-radius: 8px;
-  /* Centre the SVG child */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -205,24 +216,44 @@ body.transitions-ready {
   border-color: transparent;
 }
 
+/* Full-width left-panel button variant */
+.btn-full {
+  width: 100%;
+  height: 36px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  padding: 0 10px;
+  justify-content: flex-start;
+}
+
+/* Accent-outline variant — for generative actions (mockup) */
+.btn-generate {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.btn-generate:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-bg));
+  border-color: var(--color-accent);
+}
+
 /* ── Canvas area ─────────────────────────────────────────────────────────── */
 .studio-stage {
   flex: 1;
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--panel-width);
   min-width: 0;
+  position: relative;
   background: var(--color-bg);
 }
 
 .canvas-area {
   position: relative;
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   background: var(--color-bg);
-  min-width: 0;
 }
 
 .canvas-toggle {
@@ -275,14 +306,12 @@ body.transitions-ready {
 
 #main-canvas {
   display: block;
-  /* JS sets width/height inline; CSS constrains max dimensions */
   max-width: 100%;
   max-height: 100%;
-  image-rendering: -webkit-optimize-contrast; /* crisp on retina */
+  image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
 }
 
-/* Hidden state managed by JS via .hidden attribute */
 #main-canvas[hidden],
 #empty-state[hidden] {
   display: none;
@@ -298,15 +327,17 @@ body.transitions-ready {
   user-select: none;
 }
 
-/* ── AI critique panel ───────────────────────────────────────────────────── */
+/* ── Critique panel (right) ──────────────────────────────────────────────── */
 .critique-panel {
+  flex-shrink: 0;
+  width: var(--panel-width);
   border-left: 1px solid var(--color-border);
   background: color-mix(in srgb, var(--color-bg) 84%, var(--color-surface));
-  padding: 22px 20px;
+  padding: 22px 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  overflow: auto;
+  overflow-y: auto;
 }
 
 .panel-kicker,
@@ -325,12 +356,6 @@ body.transitions-ready {
   line-height: 1.2;
 }
 
-.mode-control {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
 .mode-select {
   width: 100%;
   min-height: 36px;
@@ -341,6 +366,7 @@ body.transitions-ready {
   font-family: var(--font-ui);
   font-size: 0.84rem;
   padding: 0 10px;
+  cursor: pointer;
 }
 
 .mode-select:focus-visible {
@@ -433,32 +459,7 @@ body.transitions-ready {
   margin-top: 4px;
 }
 
-.btn-panel {
-  margin-top: auto;
-  min-height: 38px;
-  border: 1px solid var(--color-accent);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--color-text);
-  font-family: var(--font-ui);
-  font-size: 0.82rem;
-  font-weight: 650;
-  cursor: pointer;
-}
-
-.btn-panel:hover:not(:disabled) {
-  background: var(--color-surface-2);
-}
-
-.btn-panel:disabled {
-  opacity: 0.42;
-  cursor: not-allowed;
-}
-
-#mockup-btn {
-  margin-top: 0;
-}
-
+/* Workflow tint on the critique panel header */
 .critique-panel[data-workflow="reference-ideation"] .panel-title::after {
   content: " · ideation";
   color: var(--color-text-muted);
@@ -471,16 +472,60 @@ body.transitions-ready {
   font-weight: 500;
 }
 
-@media (max-width: 860px) {
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 960px) {
+  :root {
+    --left-panel-width: 170px;
+    --panel-width: 260px;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-layout {
+    flex-wrap: wrap;
+  }
+
+  .left-panel {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .left-panel-section {
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  .field-label {
+    display: none;
+  }
+
+  .btn-full {
+    width: auto;
+    height: 32px;
+    font-size: 0.78rem;
+    padding: 0 10px;
+  }
+
   .studio-stage {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto;
+    flex: 1;
+    min-height: 0;
+    height: calc(100vh - var(--header-height) - 56px);
   }
 
   .critique-panel {
+    width: 100%;
     border-left: none;
     border-top: 1px solid var(--color-border);
-    max-height: 38vh;
-    padding: 16px;
+    max-height: 36vh;
+    padding: 14px;
   }
 }

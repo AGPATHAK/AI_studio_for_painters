@@ -722,9 +722,11 @@ function refreshWorkflowChrome() {
   panelKicker.textContent = copy.kicker;
   panelTitle.textContent = copy.title;
   uploadBtn.textContent = isInProcessMode()
-    ? 'WIP'
-    : (isFinishedMode() ? 'Final' : 'Upload');
-  critiqueBtn.textContent = isReferenceIdeationMode() ? 'Idea' : 'Crit';
+    ? 'Upload WIP'
+    : (isFinishedMode() ? 'Upload Painting' : 'Upload Reference');
+  critiqueBtn.textContent = isReferenceIdeationMode()
+    ? 'Run Ideation'
+    : (isInProcessMode() ? 'Critique WIP' : 'Critique Painting');
 }
 
 function refreshReferenceIdeationCopy() {
@@ -824,6 +826,7 @@ function refreshAiCritiqueCopy() {
     sceneRead ||
     repaint ||
     'AI critique unavailable. Please retry.';
+  aiCritiqueSection.hidden = false;
   setAiItem(aiSceneItem, aiSceneRead, sceneRead);
   setAiItem(aiValueItem, aiValueCritique, valueCritique);
   setAiItem(aiEdgeItem, aiEdgeCritique, critique.edgeAtmosphereCritique);
