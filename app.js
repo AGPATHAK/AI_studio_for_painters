@@ -76,6 +76,7 @@ const panelTitle = critiquePanel?.querySelector('.panel-title');
 const critiqueMessage = document.getElementById('critique-message');
 const semanticSource  = document.getElementById('semantic-source');
 const mockupBtn = document.getElementById('mockup-btn');
+const printBtn  = document.getElementById('print-btn');
 const mockupSection = document.getElementById('mockup-section');
 const mockupStatus = document.getElementById('mockup-status');
 const mockupImage = document.getElementById('mockup-image');
@@ -114,7 +115,7 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !canvas || !emptyState || !canvasToggle || !showOriginalBtn ||
     !showMockupBtn || !critiquePanel || !panelKicker || !panelTitle ||
     !critiqueMessage ||
-    !semanticSource || !mockupBtn || !mockupSection || !mockupStatus ||
+    !semanticSource || !mockupBtn || !printBtn || !mockupSection || !mockupStatus ||
     !mockupImage || !mockupDownload ||
     !aiCritiqueSection || !aiSceneItem ||
     !aiSceneRead || !aiValueItem || !aiValueCritique ||
@@ -1104,6 +1105,7 @@ function refreshCritiquePanel(reason) {
   refreshSemanticSource();
   refreshCritiqueCopy();
   refreshMockupUi();
+  printBtn.hidden = !appState.semantic;
 
   renderCurrentDisplay();
   console.log(`APS: critique render complete: ${reason}`);
@@ -1287,6 +1289,7 @@ modeTabs.forEach(tab => {
 });
 
 mockupBtn.addEventListener('click', requestAnnotatedMockup);
+printBtn.addEventListener('click', () => window.print());
 
 showOriginalBtn.addEventListener('click', () => {
   setDisplayMode('original');

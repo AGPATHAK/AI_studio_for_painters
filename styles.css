@@ -563,6 +563,141 @@ body.transitions-ready {
   font-weight: 500;
 }
 
+/* Print / save PDF — bottom of critique panel, mirrors .btn-clear style */
+.btn-print {
+  display: block;
+  margin-top: auto;
+  padding: 4px 2px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-family: var(--font-ui);
+  font-size: 0.75rem;
+  letter-spacing: 0.03em;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.12s ease;
+}
+
+.btn-print:hover {
+  color: var(--color-text);
+}
+
+.btn-print[hidden] {
+  display: none;
+}
+
+/* ── Print / save PDF ────────────────────────────────────────────────────── */
+@media print {
+  @page {
+    size: landscape;
+    margin: 1.2cm 1.5cm;
+  }
+
+  html, body {
+    overflow: visible;
+    height: auto;
+    background: white;
+    color: black;
+  }
+
+  /* Hide all chrome */
+  .app-header,
+  .left-panel,
+  .canvas-toggle,
+  .semantic-source,
+  .mockup-section,
+  .btn-print,
+  .empty-state {
+    display: none !important;
+  }
+
+  /* Two-column layout: image left, critique right */
+  .app-layout {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    padding-top: 0;
+    height: auto;
+    gap: 0;
+  }
+
+  .studio-stage {
+    flex: 0 0 54%;
+    position: static;
+  }
+
+  .canvas-area {
+    position: static;
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+    background: white;
+  }
+
+  #main-canvas {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  /* Critique panel */
+  .critique-panel {
+    flex: 1;
+    border-left: 0.5pt solid #bbb;
+    border-top: none;
+    background: white;
+    color: black;
+    padding: 0 0 0 1.4cm;
+    overflow: visible;
+    gap: 7pt;
+  }
+
+  .panel-kicker,
+  .section-label {
+    color: #666;
+    font-size: 6.5pt;
+    letter-spacing: 0.09em;
+  }
+
+  .panel-title {
+    color: black;
+    font-size: 10.5pt;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  /* Suppress workflow tint suffix on panel title */
+  .critique-panel .panel-title::after {
+    display: none;
+  }
+
+  .panel-copy {
+    color: black;
+    font-size: 7.5pt;
+    line-height: 1.5;
+  }
+
+  .ai-critique-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6pt;
+  }
+
+  .ai-critique-item {
+    border-top: 0.5pt solid #ccc;
+    padding-top: 5pt;
+    color: black;
+    font-size: 7.5pt;
+    line-height: 1.5;
+  }
+
+  .ai-critique-item[hidden] {
+    display: none !important;
+  }
+}
+
 /* ── Responsive ──────────────────────────────────────────────────────────── */
 @media (max-width: 960px) {
   :root {
