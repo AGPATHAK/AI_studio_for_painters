@@ -55,9 +55,13 @@ const SEMANTIC_SCHEMA = {
     priorityDiagnosis: { type: 'STRING' },
     sceneRead: { type: 'STRING' },
     valueStructureCritique: { type: 'STRING' },
+    focalHierarchyCritique: { type: 'STRING' },
     edgeAtmosphereCritique: { type: 'STRING' },
+    chromaHierarchyCritique: { type: 'STRING' },
+    watercolorHandling: { type: 'STRING' },
     interventionScope: { type: 'STRING' },
     demonstrationDescription: { type: 'STRING' },
+    teachingPoint: { type: 'STRING' },
     repaintHandoff: { type: 'STRING' },
     preserve: { type: 'STRING' },
     avoid: { type: 'STRING' },
@@ -67,9 +71,13 @@ const SEMANTIC_SCHEMA = {
     'priorityDiagnosis',
     'sceneRead',
     'valueStructureCritique',
+    'focalHierarchyCritique',
     'edgeAtmosphereCritique',
+    'chromaHierarchyCritique',
+    'watercolorHandling',
     'interventionScope',
     'demonstrationDescription',
+    'teachingPoint',
     'repaintHandoff',
     'preserve',
     'avoid',
@@ -146,14 +154,23 @@ const ANNOTATED_MOCKUP_PROMPT = [
 ].join(' ');
 
 const IN_PROCESS_PROMPT = [
-  'You are a candid watercolor studio mentor reviewing a work-in-progress painting photo.',
-  'This is In-Process Mode. The first image is always the current WIP painting and is sufficient by itself.',
-  'A reference photo and/or annotated mockup may follow as optional context only; do not require them and do not critique them as the main image.',
-  'Use optional context to understand intent, motif, or planned structure, then judge the WIP on its own painting terms.',
-  'Focus on what is working, what to adjust next, value structure, edge control, focal hierarchy, overworked areas,',
-  'lost-and-found edges, and the next 3 to 5 concrete painting actions.',
-  'Keep guidance selective, repaintable, and aware of wet media limits. Preserve freshness and useful ambiguity.',
-  'Avoid generic praise, global redesign, photoreal correction, image-generation language, and advice that depends on unavailable reference material.',
+  'You are a candid watercolor studio mentor reviewing a work-in-progress painting.',
+  'This is In-Process Mode. Judge the WIP on its own painting terms.',
+  'A reference photo and/or annotated mockup may follow as optional context only; use them to understand intent, then focus on the WIP.',
+  'Teach ONE priority lesson: name the most structurally important issue and defer secondary critiques unless they directly support that lesson.',
+  'Diagnose before prescribing: name what is happening visually, explain why it matters as painting, then state what to try next.',
+  'Value structure: assess shadow mass coherence — are the darks connected into dominant families or scattered?',
+  'Are midtones overactive? Does the painting hold its read at a squint or from a distance?',
+  'Focal hierarchy: name where the eye lands, what competes with it, and whether edges and contrast are allocated to support one dominant claim.',
+  'Edge economy: which edges are over-equal? Which should be lost or softened? Where should hard edges be reserved for the focal area only?',
+  'Chroma hierarchy: is saturation supporting depth and focal emphasis, or competing everywhere?',
+  'Watercolor handling: name whether key passages feel fresh or overworked.',
+  'If paper integrity is damaged, say so and recommend repainting over patching.',
+  'Intervention scope: name the scope class — local, regional, compositional, or global study —',
+  'and identify the protected passages before prescribing anything.',
+  'AI tightness bias: your guidance must not push the painting toward more explicit edges, more separated forms, or digital tightness.',
+  'Preserve ambiguity, atmospheric merging, and lost edges where they serve the painting.',
+  'Close with one transferable teaching point that the painter can carry into future work beyond this image.',
   'Return JSON only, in the requested field order. Each field should be concise but actionable in the studio.'
 ].join(' ');
 
@@ -161,11 +178,17 @@ const FINISHED_CRITIQUE_PROMPT = [
   'You are an experienced watercolor painter and juror reviewing a finished painting.',
   'This is Finished Painting Critique Mode. The first image is the completed painting and is sufficient by itself.',
   'A reference, annotated mockup, or WIP may follow as optional context only; judge the finished painting as the main work.',
-  'Do not give a beginner tutorial. Give serious painter feedback about whether the piece feels resolved.',
-  'Critique first-read impact, focal hierarchy, value organization, edge hierarchy, compositional unity, color harmony,',
-  'fresh versus overworked passages, brush economy, visual flow, emotional read, framing/cropping, and whether to stop or continue.',
+  'Do not give a beginner tutorial. Give serious studio or exhibition-level feedback about whether the piece feels resolved.',
+  'Name the one issue that most determines whether this painting succeeds or fails.',
+  'Value structure: judge value organization, shadow mass architecture, and readability at distance.',
+  'Focal hierarchy: does the eye know where to go? What competes with it? Are edges and contrast hierarchically allocated?',
+  'Edge economy: assess edge variety, brush economy, and whether hard edges are spent wisely near the focal area.',
+  'Chroma hierarchy: is saturation controlled, compositionally justified, and supporting depth?',
+  'Watercolor handling: assess freshness, transparency, wash unity, and paper integrity. Name overworked passages directly.',
+  'AI tightness bias: resist calling for more rendering, sharper definition, or finishing that would make the painting less painterly.',
+  'Give explicit stop/continue guidance. If further changes risk overworking the painting, say so clearly.',
+  'Close with one transferable teaching point.',
   'Be candid and specific. Avoid excessive positivity, decorative adjectives, AI-art phrasing, and generic encouragement.',
-  'If further changes risk overworking the painting, say so clearly.',
   'Return JSON only, in the requested field order. Each field should sound like a concise exhibition or studio critique.'
 ].join(' ');
 
@@ -475,7 +498,7 @@ async function callGeminiInProcessPass(context) {
           response_mime_type: 'application/json',
           response_schema: SEMANTIC_SCHEMA,
           temperature: 0.2,
-          max_output_tokens: 2400
+          max_output_tokens: 3200
         }
       })
     }
@@ -563,7 +586,7 @@ async function callGeminiFinishedPass(context) {
           response_mime_type: 'application/json',
           response_schema: SEMANTIC_SCHEMA,
           temperature: 0.25,
-          max_output_tokens: 2400
+          max_output_tokens: 3200
         }
       })
     }
@@ -672,14 +695,18 @@ function buildInProcessPrompt(context) {
     IN_PROCESS_PROMPT,
     '',
     `Context: ${contextLine}.`,
-    'For priorityDiagnosis, name the single most useful WIP lesson.',
-    'For sceneRead, describe what the current painting reads as, including uncertainty if needed.',
-    'For valueStructureCritique, explain the biggest value grouping issue or strength.',
-    'For edgeAtmosphereCritique, include edge control, lost-and-found edges, and overworked or too-equal passages.',
-    'For interventionScope, define the narrow area or relationship to adjust next.',
-    'For demonstrationDescription, describe the kind of small study mark or mental overlay that would clarify the correction.',
+    'For priorityDiagnosis, name the single most structurally important lesson in one or two sentences.',
+    'For sceneRead, describe what the current painting reads as from a distance, including uncertainty if needed.',
+    'For valueStructureCritique, assess shadow mass coherence, midtone activity, and whether darks are connected into dominant families.',
+    'For focalHierarchyCritique, name the dominant focal claim, what competes with it, and whether edges and contrast support or undermine it.',
+    'For edgeAtmosphereCritique, identify over-equal edges, passages to lose or soften, and where hard edges are misallocated.',
+    'For chromaHierarchyCritique, say whether saturation is supporting depth and focal emphasis or competing across the painting.',
+    'For watercolorHandling, name specific passages that feel fresh or overworked. If paper integrity is damaged, say so and recommend repainting.',
+    'For interventionScope, name the scope class (local, regional, compositional, or global study), the target passage, and the protected passages.',
+    'For demonstrationDescription, describe a small mental overlay or study mark that would clarify the correction without over-rendering.',
+    'For teachingPoint, name one transferable principle the painter can carry beyond this image.',
     'For repaintHandoff, give 3 to 5 ordered next painting actions in one compact paragraph.',
-    'For preserve and avoid, be specific about what should stay fresh and what action would make the WIP worse.'
+    'For preserve and avoid, be specific about what should stay fresh and what action would damage the WIP further.'
   ].join('\n');
 }
 
@@ -694,14 +721,18 @@ function buildFinishedCritiquePrompt(context) {
     FINISHED_CRITIQUE_PROMPT,
     '',
     `Context: ${contextLine}.`,
-    'For priorityDiagnosis, state the strongest final critique in terms of resolution or unresolved weakness.',
-    'For sceneRead, describe the first read of the finished painting, not the source material.',
-    'For valueStructureCritique, judge value organization and readability.',
-    'For edgeAtmosphereCritique, judge edge hierarchy, freshness, overworked passages, and brush economy.',
-    'For interventionScope, say whether any final adjustment is narrow enough to risk, or whether the painting should stop.',
-    'For demonstrationDescription, describe a mental comparison or small test, not a tutorial demo.',
-    'For repaintHandoff, give a concise final verdict with any limited next actions and explicit stop/continue guidance.',
-    'For preserve and avoid, identify what must remain untouched and what would weaken the finished work.'
+    'For priorityDiagnosis, state the single strongest critique: what determines whether this painting succeeds or fails.',
+    'For sceneRead, describe the first read of the finished painting — what the eye does, where it lands, what it feels.',
+    'For valueStructureCritique, judge value organization, shadow mass architecture, and readability at distance.',
+    'For focalHierarchyCritique, say whether focal contrast, edge emphasis, and chroma are hierarchically allocated to one dominant area.',
+    'For edgeAtmosphereCritique, judge edge variety, atmospheric freshness, and whether hard edges are spent wisely.',
+    'For chromaHierarchyCritique, judge whether saturation is compositionally justified and supporting depth.',
+    'For watercolorHandling, assess freshness, transparency, wash unity, paper integrity, and name any overworked passages directly.',
+    'For interventionScope, say whether any final adjustment is narrow enough to attempt, or whether the painting should stop.',
+    'For demonstrationDescription, describe a mental comparison or small test that would clarify whether a change is worth risking.',
+    'For teachingPoint, name one transferable lesson from this painting.',
+    'For repaintHandoff, give explicit stop/continue guidance and any final limited actions.',
+    'For preserve and avoid, identify what must remain untouched and what action would weaken or overwork the finished painting.'
   ].join('\n');
 }
 
@@ -738,9 +769,13 @@ function normalizeSemanticResponse(raw, workflowMode = WORKFLOW_MODES.IN_PROGRES
     priorityDiagnosis: cleanText(safe.priorityDiagnosis, ''),
     sceneRead: cleanText(safe.sceneRead, ''),
     valueStructureCritique: cleanText(safe.valueStructureCritique, ''),
+    focalHierarchyCritique: cleanText(safe.focalHierarchyCritique, ''),
     edgeAtmosphereCritique: cleanText(safe.edgeAtmosphereCritique, ''),
+    chromaHierarchyCritique: cleanText(safe.chromaHierarchyCritique, ''),
+    watercolorHandling: cleanText(safe.watercolorHandling, ''),
     interventionScope: cleanText(safe.interventionScope, ''),
     demonstrationDescription: cleanText(safe.demonstrationDescription, ''),
+    teachingPoint: cleanText(safe.teachingPoint, ''),
     repaintHandoff: cleanText(safe.repaintHandoff, ''),
     preserve: cleanText(safe.preserve, ''),
     avoid: cleanText(safe.avoid, ''),
