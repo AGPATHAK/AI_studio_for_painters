@@ -590,7 +590,7 @@ body.transitions-ready {
 /* ── Print / save PDF ────────────────────────────────────────────────────── */
 @media print {
   @page {
-    size: landscape;
+    size: portrait;
     margin: 1.4cm 1.6cm;
   }
 
@@ -612,50 +612,52 @@ body.transitions-ready {
     display: none !important;
   }
 
-  /* Two-column layout: image left (60%), critique right (40%) */
+  /* Stack image above critique */
   .app-layout {
     display: flex;
-    flex-direction: row;
-    align-items: flex-start;
+    flex-direction: column;
+    align-items: stretch;
     padding-top: 0;
     height: auto;
     gap: 0;
   }
 
   .studio-stage {
-    flex: 0 0 60%;
+    flex: none;
     position: static;
-    padding-right: 1.2cm;
+    display: flex;
+    justify-content: center;
+    padding: 0 0 0.8cm 0;
   }
 
   .canvas-area {
     position: static;
-    width: 100%;
+    width: auto;
     height: auto;
-    display: block;
+    display: flex;
+    justify-content: center;
     overflow: visible;
     background: white;
-    align-items: flex-start;
-    justify-content: flex-start;
   }
 
-  /* Stretch canvas to fill the column */
+  /* Image: centred, constrained to upper portion of the page */
   #main-canvas {
     display: block;
-    width: 100%;
+    max-width: 100%;
+    max-height: 13cm;
+    width: auto;
     height: auto;
   }
 
-  /* Critique panel */
+  /* Critique panel: full width below the image */
   .critique-panel {
-    flex: 1;
-    border-left: 1pt solid #bbb;
-    border-top: none;
+    flex: none;
+    border-top: 1pt solid #bbb;
+    border-left: none;
     background: white;
     color: black;
-    padding: 0 0 0 1.2cm;
+    padding: 0.6cm 0 0 0;
     overflow: visible;
-    gap: 9pt;
   }
 
   .panel-kicker {
@@ -684,6 +686,14 @@ body.transitions-ready {
     font-size: 9pt;
     line-height: 1.6;
     font-style: italic;
+    margin-bottom: 6pt;
+  }
+
+  /* Critique items flow in two columns across the full page width */
+  .ai-critique-section {
+    column-count: 2;
+    column-gap: 1.4cm;
+    margin-top: 6pt;
   }
 
   .section-label {
@@ -695,16 +705,11 @@ body.transitions-ready {
     display: block;
   }
 
-  .ai-critique-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8pt;
-    margin-top: 6pt;
-  }
-
   .ai-critique-item {
     border-top: 0.5pt solid #ddd;
     padding-top: 6pt;
+    margin-bottom: 8pt;
+    break-inside: avoid;
     color: black;
     font-size: 8.5pt;
     line-height: 1.55;
