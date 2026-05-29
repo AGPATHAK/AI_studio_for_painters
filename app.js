@@ -85,12 +85,20 @@ const aiSceneItem = document.getElementById('ai-scene-item');
 const aiSceneRead = document.getElementById('ai-scene-read');
 const aiValueItem = document.getElementById('ai-value-item');
 const aiValueCritique = document.getElementById('ai-value-critique');
+const aiFocalItem = document.getElementById('ai-focal-item');
+const aiFocalCritique = document.getElementById('ai-focal-critique');
 const aiEdgeItem = document.getElementById('ai-edge-item');
 const aiEdgeCritique = document.getElementById('ai-edge-critique');
+const aiChromaItem = document.getElementById('ai-chroma-item');
+const aiChromaCritique = document.getElementById('ai-chroma-critique');
+const aiWatercolorItem = document.getElementById('ai-watercolor-item');
+const aiWatercolorHandling = document.getElementById('ai-watercolor-handling');
 const aiScopeItem = document.getElementById('ai-scope-item');
 const aiScope = document.getElementById('ai-scope');
 const aiDemoItem = document.getElementById('ai-demo-item');
 const aiDemo = document.getElementById('ai-demo');
+const aiTeachingItem = document.getElementById('ai-teaching-item');
+const aiTeachingPoint = document.getElementById('ai-teaching-point');
 const aiRepaintItem = document.getElementById('ai-repaint-item');
 const aiRepaint = document.getElementById('ai-repaint');
 const aiPreserveItem = document.getElementById('ai-preserve-item');
@@ -109,9 +117,14 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !semanticSource || !mockupBtn || !mockupSection || !mockupStatus ||
     !mockupImage || !mockupDownload ||
     !aiCritiqueSection || !aiSceneItem ||
-    !aiSceneRead || !aiValueItem || !aiValueCritique || !aiEdgeItem ||
-    !aiEdgeCritique || !aiScopeItem || !aiScope || !aiDemoItem ||
-    !aiDemo || !aiRepaintItem || !aiRepaint || !aiPreserveItem ||
+    !aiSceneRead || !aiValueItem || !aiValueCritique ||
+    !aiFocalItem || !aiFocalCritique ||
+    !aiEdgeItem || !aiEdgeCritique ||
+    !aiChromaItem || !aiChromaCritique ||
+    !aiWatercolorItem || !aiWatercolorHandling ||
+    !aiScopeItem || !aiScope || !aiDemoItem ||
+    !aiDemo || !aiTeachingItem || !aiTeachingPoint ||
+    !aiRepaintItem || !aiRepaint || !aiPreserveItem ||
     !aiPreserve || !aiAvoidItem || !aiAvoid || !aiUncertaintyItem ||
     !aiUncertainty) {
   console.error('APS: one or more required DOM elements not found.');
@@ -330,9 +343,13 @@ function normalizeInProcessCritique(raw) {
     priorityDiagnosis: cleanUiText(safe.priorityDiagnosis),
     sceneRead: cleanUiText(safe.sceneRead),
     valueStructureCritique: cleanUiText(safe.valueStructureCritique),
+    focalHierarchyCritique: cleanUiText(safe.focalHierarchyCritique),
     edgeAtmosphereCritique: cleanUiText(safe.edgeAtmosphereCritique),
+    chromaHierarchyCritique: cleanUiText(safe.chromaHierarchyCritique),
+    watercolorHandling: cleanUiText(safe.watercolorHandling),
     interventionScope: cleanUiText(safe.interventionScope),
     demonstrationDescription: cleanUiText(safe.demonstrationDescription),
+    teachingPoint: cleanUiText(safe.teachingPoint),
     repaintHandoff: cleanUiText(safe.repaintHandoff),
     preserve: cleanUiText(safe.preserve),
     avoid: cleanUiText(safe.avoid),
@@ -349,9 +366,13 @@ function normalizeFinishedCritique(raw) {
     priorityDiagnosis: cleanUiText(safe.priorityDiagnosis),
     sceneRead: cleanUiText(safe.sceneRead),
     valueStructureCritique: cleanUiText(safe.valueStructureCritique),
+    focalHierarchyCritique: cleanUiText(safe.focalHierarchyCritique),
     edgeAtmosphereCritique: cleanUiText(safe.edgeAtmosphereCritique),
+    chromaHierarchyCritique: cleanUiText(safe.chromaHierarchyCritique),
+    watercolorHandling: cleanUiText(safe.watercolorHandling),
     interventionScope: cleanUiText(safe.interventionScope),
     demonstrationDescription: cleanUiText(safe.demonstrationDescription),
+    teachingPoint: cleanUiText(safe.teachingPoint),
     repaintHandoff: cleanUiText(safe.repaintHandoff),
     preserve: cleanUiText(safe.preserve),
     avoid: cleanUiText(safe.avoid),
@@ -783,9 +804,13 @@ function refreshReferenceIdeationCopy() {
 
   setAiItem(aiSceneItem, aiSceneRead, dominantRead);
   setAiItem(aiValueItem, aiValueCritique, valueMasses);
+  setAiItem(aiFocalItem, aiFocalCritique, '');
   setAiItem(aiEdgeItem, aiEdgeCritique, atmosphere);
+  setAiItem(aiChromaItem, aiChromaCritique, '');
+  setAiItem(aiWatercolorItem, aiWatercolorHandling, '');
   setAiItem(aiScopeItem, aiScope, compositionIdeas);
   setAiItem(aiDemoItem, aiDemo, simplification);
+  setAiItem(aiTeachingItem, aiTeachingPoint, '');
   setAiItem(aiRepaintItem, aiRepaint, paletteMood);
   setAiItem(aiPreserveItem, aiPreserve, ideation.emphasize);
   setAiItem(aiAvoidItem, aiAvoid, ideation.suppress);
@@ -813,9 +838,13 @@ function refreshAiCritiqueCopy() {
 
   setAiLabel(aiSceneItem, isFinishedMode() ? 'First read' : 'Scene read');
   setAiLabel(aiValueItem, 'Value structure');
+  setAiLabel(aiFocalItem, 'Focal hierarchy');
   setAiLabel(aiEdgeItem, isFinishedMode() ? 'Edges and finish' : 'Edges and atmosphere');
+  setAiLabel(aiChromaItem, 'Chroma');
+  setAiLabel(aiWatercolorItem, 'Watercolor handling');
   setAiLabel(aiScopeItem, isFinishedMode() ? 'Final adjustment scope' : 'Scope');
   setAiLabel(aiDemoItem, isFinishedMode() ? 'Resolution test' : 'Demonstration');
+  setAiLabel(aiTeachingItem, 'Teaching point');
   setAiLabel(aiRepaintItem, isFinishedMode() ? 'Final verdict' : 'Repaint handoff');
   setAiLabel(aiPreserveItem, 'Preserve');
   setAiLabel(aiAvoidItem, 'Avoid');
@@ -829,9 +858,13 @@ function refreshAiCritiqueCopy() {
   aiCritiqueSection.hidden = false;
   setAiItem(aiSceneItem, aiSceneRead, sceneRead);
   setAiItem(aiValueItem, aiValueCritique, valueCritique);
+  setAiItem(aiFocalItem, aiFocalCritique, critique.focalHierarchyCritique);
   setAiItem(aiEdgeItem, aiEdgeCritique, critique.edgeAtmosphereCritique);
+  setAiItem(aiChromaItem, aiChromaCritique, critique.chromaHierarchyCritique);
+  setAiItem(aiWatercolorItem, aiWatercolorHandling, critique.watercolorHandling);
   setAiItem(aiScopeItem, aiScope, scope);
   setAiItem(aiDemoItem, aiDemo, demo);
+  setAiItem(aiTeachingItem, aiTeachingPoint, critique.teachingPoint);
   setAiItem(aiRepaintItem, aiRepaint, repaint);
   setAiItem(aiPreserveItem, aiPreserve, preserve);
   setAiItem(aiAvoidItem, aiAvoid, avoid);
