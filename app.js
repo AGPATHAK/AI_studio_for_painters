@@ -79,6 +79,10 @@ const canvasToggle = document.getElementById('canvas-toggle');
 const showOriginalBtn = document.getElementById('show-original-btn');
 const showMockupBtn = document.getElementById('show-mockup-btn');
 const showCorrectionBtn = document.getElementById('show-correction-btn');
+const showCompareBtn    = document.getElementById('show-compare-btn');
+const compareArea          = document.getElementById('compare-area');
+const compareOriginalImg   = document.getElementById('compare-original-img');
+const compareCorrectionImg = document.getElementById('compare-correction-img');
 const critiquePanel   = document.getElementById('critique-panel');
 const panelKicker = critiquePanel?.querySelector('.panel-kicker');
 const panelTitle = critiquePanel?.querySelector('.panel-title');
@@ -124,7 +128,9 @@ const aiUncertainty = document.getElementById('ai-uncertainty');
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !modeTabs.length ||
     !canvas || !emptyState || !canvasToggle || !showOriginalBtn ||
-    !showMockupBtn || !showCorrectionBtn || !critiquePanel || !panelKicker || !panelTitle ||
+    !showMockupBtn || !showCorrectionBtn || !showCompareBtn ||
+    !compareArea || !compareOriginalImg || !compareCorrectionImg ||
+    !critiquePanel || !panelKicker || !panelTitle ||
     !critiqueMessage ||
     !semanticSource || !mockupBtn || !printBtn || !mockupSection || !mockupStatus ||
     !mockupImage || !mockupDownload ||
@@ -1112,7 +1118,7 @@ function resetCorrection() {
     error: '',
     sourceCritiqueKey: null
   };
-  if (appState.displayMode === 'correction') {
+  if (appState.displayMode === 'correction' || appState.displayMode === 'compare') {
     appState.displayMode = 'original';
   }
 }
@@ -1251,17 +1257,18 @@ function refreshCanvasToggle() {
   showMockupBtn.disabled = !hasMockup;
   showCorrectionBtn.hidden = !hasCorrection;
   showCorrectionBtn.disabled = !hasCorrection;
+  showCompareBtn.hidden = !hasCorrection;
+  showCompareBtn.disabled = !hasCorrection;
   showOriginalBtn.classList.toggle('is-active', appState.displayMode === 'original');
   showMockupBtn.classList.toggle('is-active', appState.displayMode === 'mockup');
   showCorrectionBtn.classList.toggle('is-active', appState.displayMode === 'correction');
+  showCompareBtn.classList.toggle('is-active', appState.displayMode === 'compare');
 }
 
 function setDisplayMode(mode) {
   if (mode === 'mockup' && !appState.mockup.bitmap) return;
-  if (mode === 'correction' && !appState.correction.bitmap) return;
-  if (mode === 'correction') appState.displayMode = 'correction';
-  else if (mode === 'mockup') appState.displayMode = 'mockup';
-  else appState.displayMode = 'original';
+  if ((mode === 'correction' || mode === 'compare') && !appState.correction.bitmap) return;
+  appState.displayMode = ['mockup', 'correction', 'compare'].includes(mode) ? mode : 'original';
   refreshCanvasToggle();
   renderCurrentDisplay();
 }
@@ -1375,9 +1382,19 @@ function renderCanvas(bitmap) {
 }
 
 function renderCurrentDisplay() {
+  if (appState.displayMode === 'compare' && appState.correction.bitmap) {
+    canvas.hidden = true;
+    compareArea.hidden = false;
+    const srcUrl = getActiveImageState().srcUrl;
+    compareOriginalImg.src = srcUrl || '';
+    compareCorrectionImg.src = appState.correction.imageDataUrl || '';
+    return;
+  }
+
+  compareArea.hidden = true;
   const bitmap = getDisplayBitmap();
   if (!bitmap) return;
-
+  canvas.hidden = false;
   renderCanvas(bitmap);
 }
 
@@ -1395,6 +1412,7 @@ function showCanvas() {
 
 function showEmptyState() {
   canvas.hidden       = true;
+  compareArea.hidden  = true;
   emptyState.hidden   = false;
   canvasToggle.hidden = true;
   resetBtn.disabled   = true;
@@ -1618,6 +1636,10 @@ showMockupBtn.addEventListener('click', () => {
 
 showCorrectionBtn.addEventListener('click', () => {
   setDisplayMode('correction');
+});
+
+showCompareBtn.addEventListener('click', () => {
+  setDisplayMode('compare');
 });
 
 /* ── Resize re-fit ────────────────────────────────────────────────────────── */

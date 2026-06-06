@@ -79,6 +79,21 @@
           <button class="canvas-toggle-btn" id="show-correction-btn" type="button" disabled hidden>
             Correction
           </button>
+          <button class="canvas-toggle-btn" id="show-compare-btn" type="button" disabled hidden>
+            Compare
+          </button>
+        </div>
+
+        <div class="compare-area" id="compare-area" hidden>
+          <figure class="compare-pane">
+            <figcaption class="compare-label">Original</figcaption>
+            <img id="compare-original-img" alt="Original painting" />
+          </figure>
+          <div class="compare-divider" aria-hidden="true"></div>
+          <figure class="compare-pane">
+            <figcaption class="compare-label">Correction</figcaption>
+            <img id="compare-correction-img" alt="Correction" />
+          </figure>
         </div>
 
         <canvas id="main-canvas"

@@ -631,7 +631,8 @@ body.transitions-ready {
   .mockup-section,
   .btn-print,
   .critique-action-btn,
-  .edit-request-preview {
+  .edit-request-preview,
+  .compare-area {
     display: none !important;
   }
 
@@ -898,3 +899,55 @@ body.transitions-ready {
 }
 
 .btn-dismiss-preview:hover { color: var(--color-text); }
+
+/* ── M4: Side-by-side comparison ────────────────────────────────────────── */
+
+.compare-area {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.compare-area[hidden] {
+  display: none;
+}
+
+.compare-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin: 0;
+  padding: 8px 12px 0;
+  gap: 6px;
+}
+
+.compare-label {
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.compare-pane img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100% - 24px);
+  object-fit: contain;
+  border-radius: 3px;
+}
+
+.compare-divider {
+  width: 1px;
+  background: var(--color-border);
+  align-self: stretch;
+  flex-shrink: 0;
+  margin: 16px 0;
+}
