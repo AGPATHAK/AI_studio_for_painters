@@ -82,6 +82,8 @@ const mockupStatus = document.getElementById('mockup-status');
 const mockupImage = document.getElementById('mockup-image');
 const mockupDownload = document.getElementById('mockup-download');
 const aiCritiqueSection = document.getElementById('ai-critique-section');
+const stepAnalyseHint  = document.getElementById('step-analyse-hint');
+const stepAnnotateHint = document.getElementById('step-annotate-hint');
 const aiSceneItem = document.getElementById('ai-scene-item');
 const aiSceneRead = document.getElementById('ai-scene-read');
 const aiValueItem = document.getElementById('ai-value-item');
@@ -919,6 +921,10 @@ function canGenerateMockup() {
 function refreshMockupUi() {
   mockupBtn.hidden = !supportsAnnotatedMockup();
   mockupBtn.disabled = !canGenerateMockup();
+  if (stepAnnotateHint) {
+    stepAnnotateHint.textContent = canGenerateMockup() ? '' :
+      (supportsAnnotatedMockup() && !!getActiveImageState().bitmap ? 'Analyse first' : '');
+  }
 
   const mockup = appState.mockup;
   const shouldShow = supportsAnnotatedMockup() &&
@@ -1084,6 +1090,7 @@ function showCanvas() {
   emptyState.hidden   = true;
   resetBtn.disabled   = false;
   critiqueBtn.disabled = false;
+  stepAnalyseHint.textContent = 'Tap to analyse';
   refreshCanvasToggle();
   refreshWorkflowChrome();
 }
@@ -1094,6 +1101,7 @@ function showEmptyState() {
   canvasToggle.hidden = true;
   resetBtn.disabled   = true;
   critiqueBtn.disabled = true;
+  stepAnalyseHint.textContent = '';
   canvas.width        = 0;
   canvas.height       = 0;
   refreshCritiquePanel('empty');

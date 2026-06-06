@@ -7,6 +7,7 @@
 
 const http = require('node:http');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 
 const SERVER_DIR = __dirname;
@@ -16,6 +17,7 @@ const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models
 
 loadEnv(path.join(SERVER_DIR, '.env'));
 loadEnv(path.join(ROOT_DIR, '.env'));
+loadEnv(path.join(os.homedir(), '.env'));
 
 const PORT = Number(process.env.PORT || 8080);
 const HOST = process.env.HOST || '127.0.0.1';

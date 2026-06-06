@@ -29,6 +29,7 @@
       <input type="file" id="file-input" accept="image/jpeg,image/png"
              aria-hidden="true" tabindex="-1">
 
+      <p class="panel-section-label">Session type</p>
       <div class="mode-tabs" role="group" aria-label="Painting stage">
         <button class="mode-tab is-active" data-mode="reference-ideation" type="button">
           Reference
@@ -41,17 +42,25 @@
         </button>
       </div>
 
-      <button class="btn-load" id="upload-btn">
-        Open reference
-      </button>
+      <hr class="panel-divider" aria-hidden="true">
 
-      <div class="ai-actions">
-        <button class="btn-read" id="critique-btn" disabled>
-          Explore
-        </button>
-        <button class="btn-annotate" id="mockup-btn" disabled>
-          Annotate
-        </button>
+      <div class="workflow-steps">
+
+        <div class="workflow-step">
+          <button class="btn-load" id="upload-btn">Open reference</button>
+          <p class="step-hint" id="empty-state" aria-live="polite">Load a JPG or PNG to begin</p>
+        </div>
+
+        <div class="workflow-step">
+          <button class="btn-read" id="critique-btn" disabled>Explore</button>
+          <p class="step-hint" id="step-analyse-hint"></p>
+        </div>
+
+        <div class="workflow-step">
+          <button class="btn-annotate" id="mockup-btn" disabled>Annotate</button>
+          <p class="step-hint" id="step-annotate-hint"></p>
+        </div>
+
       </div>
 
       <button class="btn-clear" id="reset-btn" disabled>
@@ -75,9 +84,6 @@
                 role="img"
                 aria-label="Uploaded painting or reference image">
         </canvas>
-        <p class="empty-state" id="empty-state" aria-live="polite">
-          Load a JPG or PNG to begin
-        </p>
       </section>
     </main>
 
