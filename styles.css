@@ -118,31 +118,42 @@ body.transitions-ready {
   display: none;
 }
 
-/* Mode segmented control */
-.mode-tabs {
+/* Mode accordion list */
+.mode-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 3px;
-  margin-bottom: 0;
-  background: var(--color-surface-2);
-  border-radius: 9px;
+}
+
+.mode-group {
+  display: flex;
+  flex-direction: column;
+  border-left: 2px solid transparent;
+  transition: border-color 0.12s ease;
+}
+
+.mode-group.is-active {
+  border-left-color: var(--color-accent);
+}
+
+.mode-group.is-active + .mode-group {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border);
 }
 
 .mode-tab {
   width: 100%;
-  padding: 8px 11px;
+  padding: 7px 10px 7px 12px;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 5px;
   font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   font-weight: 500;
   color: var(--color-text-muted);
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.12s ease, color 0.12s ease,
-              box-shadow 0.12s ease;
+  transition: color 0.12s ease, background-color 0.12s ease;
 }
 
 .mode-tab:hover:not(.is-active) {
@@ -151,10 +162,10 @@ body.transitions-ready {
 }
 
 .mode-tab.is-active {
-  background: var(--color-bg);
+  font-size: 0.82rem;
+  padding: 9px 10px 9px 12px;
   color: var(--color-text);
-  font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.09), 0 0 0 0.5px var(--color-border);
+  font-weight: 650;
 }
 
 .mode-tab:focus-visible {
@@ -162,21 +173,9 @@ body.transitions-ready {
   outline-offset: -2px;
 }
 
-/* Panel section label */
-.panel-section-label {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.07em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  margin-bottom: 8px;
-}
-
-/* Divider between session selector and workflow steps */
-.panel-divider {
-  border: none;
-  border-top: 1px solid var(--color-border);
-  margin: 14px 0 16px;
+/* Revealed action area */
+.mode-actions {
+  padding: 6px 4px 12px 14px;
 }
 
 /* Workflow steps */
@@ -761,7 +760,11 @@ body.transitions-ready {
     border-bottom: 1px solid var(--color-border);
   }
 
-  .mode-tabs  { margin-bottom: 0; flex-direction: row; border-radius: 7px; }
+  .mode-list { flex-direction: row; flex-wrap: wrap; width: 100%; gap: 4px; }
+  .mode-group { display: contents; }
+  .mode-tab   { width: auto; flex: 0 0 auto; order: 0; padding: 6px 10px; border-radius: 6px; }
+  .mode-tab.is-active { background: var(--color-surface-2); }
+  .mode-actions { flex: 1 1 100%; order: 10; padding: 6px 0 0; }
 
   .workflow-steps { flex-direction: row; flex-wrap: wrap; }
   .workflow-step  { flex: 1 0 auto; }

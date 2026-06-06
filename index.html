@@ -29,36 +29,34 @@
       <input type="file" id="file-input" accept="image/jpeg,image/png"
              aria-hidden="true" tabindex="-1">
 
-      <p class="panel-section-label">Session type</p>
-      <div class="mode-tabs" role="group" aria-label="Painting stage">
-        <button class="mode-tab is-active" data-mode="reference-ideation" type="button">
-          Reference
-        </button>
-        <button class="mode-tab" data-mode="in-progress-guidance" type="button">
-          In-Process
-        </button>
-        <button class="mode-tab" data-mode="finished-review" type="button">
-          Finished
-        </button>
-      </div>
+      <div class="mode-list" role="group" aria-label="Painting stage">
 
-      <hr class="panel-divider" aria-hidden="true">
-
-      <div class="workflow-steps">
-
-        <div class="workflow-step">
-          <button class="btn-load" id="upload-btn">Open reference</button>
-          <p class="step-hint" id="empty-state" aria-live="polite">Load a JPG or PNG to begin</p>
+        <div class="mode-group is-active" data-mode="reference-ideation">
+          <button class="mode-tab is-active" data-mode="reference-ideation" type="button">Reference</button>
+          <div class="mode-actions">
+            <div class="workflow-steps">
+              <div class="workflow-step">
+                <button class="btn-load" id="upload-btn">Open reference</button>
+                <p class="step-hint" id="empty-state" aria-live="polite">Load a JPG or PNG to begin</p>
+              </div>
+              <div class="workflow-step">
+                <button class="btn-read" id="critique-btn" disabled>Explore</button>
+                <p class="step-hint" id="step-analyse-hint"></p>
+              </div>
+              <div class="workflow-step">
+                <button class="btn-annotate" id="mockup-btn" disabled>Annotate</button>
+                <p class="step-hint" id="step-annotate-hint"></p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div class="workflow-step">
-          <button class="btn-read" id="critique-btn" disabled>Explore</button>
-          <p class="step-hint" id="step-analyse-hint"></p>
+        <div class="mode-group" data-mode="in-progress-guidance">
+          <button class="mode-tab" data-mode="in-progress-guidance" type="button">In-Process</button>
         </div>
 
-        <div class="workflow-step">
-          <button class="btn-annotate" id="mockup-btn" disabled>Annotate</button>
-          <p class="step-hint" id="step-annotate-hint"></p>
+        <div class="mode-group" data-mode="finished-review">
+          <button class="mode-tab" data-mode="finished-review" type="button">Finished</button>
         </div>
 
       </div>

@@ -1271,6 +1271,9 @@ critiqueBtn.addEventListener('click', () => {
 });
 
 function setActiveTab(mode) {
+  document.querySelectorAll('.mode-group').forEach(g => {
+    g.classList.toggle('is-active', g.dataset.mode === mode);
+  });
   modeTabs.forEach(tab => {
     tab.classList.toggle('is-active', tab.dataset.mode === mode);
   });
@@ -1282,6 +1285,9 @@ modeTabs.forEach(tab => {
     if (mode === appState.workflowMode) return;
     appState.workflowMode = mode;
     setActiveTab(mode);
+    const modeActions = document.querySelector('.mode-actions');
+    const activeGroup = document.querySelector(`.mode-group[data-mode="${mode}"]`);
+    if (modeActions && activeGroup) activeGroup.appendChild(modeActions);
     appState.displayMode = 'original';
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
