@@ -639,32 +639,33 @@ body.transitions-ready {
     flex-direction: row;
     align-items: flex-start;
     padding-top: 0;
-    height: auto;
+    height: 100vh;
     gap: 0;
   }
 
   .studio-stage {
-    flex: 0 0 60%;
+    flex: 0 0 68%;
     position: static;
     padding-right: 1.2cm;
+    height: 100%;
+    overflow: hidden;
   }
 
   .canvas-area {
     position: static;
     width: 100%;
-    height: auto;
+    height: 100%;
     display: block;
-    overflow: visible;
+    overflow: hidden;
     background: white;
-    align-items: flex-start;
-    justify-content: flex-start;
   }
 
-  /* Stretch canvas to fill the column */
+  /* Fill full column width; max-height prevents overflow to a second page */
   #main-canvas {
     display: block;
     width: 100%;
     height: auto;
+    max-height: 100%;
   }
 
   /* Critique panel */
@@ -675,7 +676,8 @@ body.transitions-ready {
     background: white;
     color: black;
     padding: 0 0 0 1.2cm;
-    overflow: visible;
+    height: 100%;
+    overflow: hidden;
     gap: 9pt;
   }
 
