@@ -633,52 +633,55 @@ body.transitions-ready {
     display: none !important;
   }
 
-  /* Two-column layout: image left (60%), critique right (40%) */
+  /* Page 1: image fills full page; page 2: full critique */
   .app-layout {
-    display: flex;
-    flex-direction: row;
-    align-items: flex-start;
+    display: block;
     padding-top: 0;
-    height: 100vh;
-    gap: 0;
+    height: auto;
   }
 
+  /* Page 1 — image fills the entire landscape page */
   .studio-stage {
-    flex: 0 0 68%;
+    width: 100%;
+    height: 100vh;
     position: static;
-    padding-right: 1.2cm;
-    height: 100%;
+    padding: 0;
     overflow: hidden;
+    break-after: page;
+    page-break-after: always;
   }
 
   .canvas-area {
     position: static;
     width: 100%;
     height: 100%;
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
     background: white;
   }
 
-  /* Fill full column width; max-height prevents overflow to a second page */
+  /* Image: fill full page height, auto width, never overflow */
   #main-canvas {
     display: block;
-    width: 100%;
-    height: auto;
-    max-height: 100%;
+    height: 100%;
+    width: auto;
+    max-width: 100%;
   }
 
-  /* Critique panel */
+  /* Page 2 — full critique, two-column for landscape readability */
   .critique-panel {
-    flex: 1;
-    border-left: 1pt solid #bbb;
-    border-top: none;
+    width: 100%;
+    border: none;
     background: white;
     color: black;
-    padding: 0 0 0 1.2cm;
-    height: 100%;
-    overflow: hidden;
-    gap: 9pt;
+    padding: 0;
+    overflow: visible;
+    height: auto;
+    break-before: page;
+    page-break-before: always;
+    display: block;
   }
 
   .panel-kicker {
@@ -690,10 +693,10 @@ body.transitions-ready {
 
   .panel-title {
     color: black;
-    font-size: 12pt;
+    font-size: 13pt;
     font-weight: 700;
     line-height: 1.2;
-    margin-bottom: 4pt;
+    margin-bottom: 5pt;
   }
 
   /* Suppress workflow tint suffix on panel title */
@@ -704,9 +707,11 @@ body.transitions-ready {
   /* Priority diagnosis shown as intro paragraph */
   .panel-copy {
     color: black;
-    font-size: 9pt;
+    font-size: 9.5pt;
     line-height: 1.6;
     font-style: italic;
+    margin-bottom: 8pt;
+    max-width: 80%;
   }
 
   .section-label {
@@ -718,11 +723,13 @@ body.transitions-ready {
     display: block;
   }
 
+  /* Two-column grid for critique items on the wide landscape page */
   .ai-critique-section {
-    display: flex;
-    flex-direction: column;
-    gap: 8pt;
-    margin-top: 6pt;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 1.4cm;
+    row-gap: 8pt;
+    margin-top: 8pt;
   }
 
   .ai-critique-item {
@@ -731,6 +738,7 @@ body.transitions-ready {
     color: black;
     font-size: 8.5pt;
     line-height: 1.55;
+    break-inside: avoid;
   }
 
   .ai-critique-item[hidden] {
