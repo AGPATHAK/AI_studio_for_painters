@@ -20,7 +20,7 @@ loadEnv(path.join(ROOT_DIR, '.env'));
 loadEnv(path.join(os.homedir(), '.env'));
 
 const PORT = Number(process.env.PORT || 8080);
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const GEMINI_IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || 'gemini-3.1-flash-image-preview';
 const LOCAL_DEV_ALLOWED_ORIGINS = new Set([
