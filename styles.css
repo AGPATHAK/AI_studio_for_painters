@@ -629,7 +629,9 @@ body.transitions-ready {
   .canvas-toggle,
   .semantic-source,
   .mockup-section,
-  .btn-print {
+  .btn-print,
+  .critique-action-btn,
+  .edit-request-preview {
     display: none !important;
   }
 
@@ -808,3 +810,84 @@ body.transitions-ready {
     padding: 14px;
   }
 }
+
+/* ── M2.5 Critique → Edit Bridge ────────────────────────────────────────── */
+
+.critique-action-btn {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-family: var(--font-ui);
+  color: var(--color-accent);
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+}
+
+.critique-action-btn:hover {
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.edit-request-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--color-surface-2);
+  border-left: 2px solid var(--color-accent);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.edit-request-preview[hidden] { display: none; }
+
+.edit-request-preview dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 10px;
+}
+
+.edit-request-preview dt {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  padding-top: 1px;
+}
+
+.edit-request-preview dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.edit-request-preview .preview-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-apply-edit {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  font-family: var(--font-ui);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  border: none;
+  border-radius: 5px;
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-dismiss-preview {
+  font-size: 0.72rem;
+  font-family: var(--font-ui);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.btn-dismiss-preview:hover { color: var(--color-text); }

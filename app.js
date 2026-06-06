@@ -55,7 +55,8 @@ const appState = {
     error: ''
   },
   displayMode: 'original', // original | mockup
-  semanticRequestId: 0
+  semanticRequestId: 0,
+  pendingEditRequest: null  // edit request staged for M3 execution
 };
 
 /* ── DOM refs ─────────────────────────────────────────────────────────────── */
@@ -872,6 +873,7 @@ function refreshAiCritiqueCopy() {
   setAiItem(aiPreserveItem, aiPreserve, preserve);
   setAiItem(aiAvoidItem, aiAvoid, avoid);
   setAiItem(aiUncertaintyItem, aiUncertainty, critique.uncertaintyNote);
+  refreshEditButtons();
   refreshMockupUi();
 }
 
@@ -884,6 +886,194 @@ function setAiItem(container, copy, text) {
   const cleaned = String(text || '').trim();
   copy.textContent = cleaned;
   container.hidden = !cleaned;
+}
+
+/* ── M2.5 Critique → Edit Bridge ─────────────────────────────────────────── */
+
+const CRITIQUE_ITEM_CONFIG = {
+  valueStructureCritique:  { issueType: 'value_structure', domRef: () => aiValueItem },
+  focalHierarchyCritique:  { issueType: 'composition',     domRef: () => aiFocalItem },
+  edgeAtmosphereCritique:  { issueType: 'edge_control',    domRef: () => aiEdgeItem  },
+  chromaHierarchyCritique: { issueType: 'chroma',          domRef: () => aiChromaItem },
+};
+
+const REGION_KEYWORDS = {
+  upper:      [0.0, 0.0, 1.0, 0.5],
+  lower:      [0.0, 0.5, 1.0, 0.5],
+  sky:        [0.0, 0.0, 1.0, 0.4],
+  background: [0.0, 0.0, 1.0, 0.5],
+  foreground: [0.0, 0.5, 1.0, 0.5],
+  corner:     [0.0, 0.0, 0.35, 0.35],
+  left:       [0.0, 0.0, 0.5, 1.0],
+  right:      [0.5, 0.0, 0.5, 1.0],
+};
+
+function resolveRegion(semantic, itemKey) {
+  const scopeText  = (semantic.interventionScope || '').toLowerCase();
+  const critiqueText = (semantic[itemKey] || '').toLowerCase();
+  const fullText   = critiqueText + ' ' + scopeText;
+
+  let scopeClass = 'global-study';
+  if      (scopeText.includes('local'))         scopeClass = 'local';
+  else if (scopeText.includes('regional'))      scopeClass = 'regional';
+  else if (scopeText.includes('composit'))      scopeClass = 'compositional';
+
+  for (const [kw, bbox] of Object.entries(REGION_KEYWORDS)) {
+    if (fullText.includes(kw)) {
+      return { mode: 'bbox', bbox, scopeClass, description: kw, confidence: 'medium', fallbackReason: '' };
+    }
+  }
+
+  return {
+    mode: 'global', bbox: null, scopeClass,
+    description: 'full image', confidence: 'low',
+    fallbackReason: 'No locatable region found in critique text'
+  };
+}
+
+function buildEditPrompt(issueType, diagnosis, preserve, avoid) {
+  const primitives = {
+    value_structure: 'unify scattered value masses into a calmer shadow architecture',
+    composition:     'suppress competing focal claims and anchor the dominant focal area',
+    edge_control:    'reduce over-equal edges; soften atmospheric passages',
+    chroma:          'mute secondary chroma to restore a single saturation priority',
+  };
+  const primitive = primitives[issueType] || 'apply the correction described below';
+  return [
+    `Demonstrate one limited painterly correction: ${primitive}.`,
+    `Diagnosis: ${diagnosis}`,
+    preserve ? `Preserve: ${preserve}.` : '',
+    avoid    ? `Avoid: ${avoid}.`       : '',
+    'Do not add detail, texture, or finish. Do not beautify. Painterly simplification only.',
+  ].filter(Boolean).join(' ');
+}
+
+function critiqueItemToEditRequest(semantic, itemKey) {
+  const cfg = CRITIQUE_ITEM_CONFIG[itemKey];
+  if (!cfg) return null;
+  const diagnosis = semantic[itemKey] || '';
+  const region    = resolveRegion(semantic, itemKey);
+  const prompt    = buildEditPrompt(cfg.issueType, diagnosis, semantic.preserve, semantic.avoid);
+  return {
+    editId:            crypto.randomUUID(),
+    sourceCritiqueKey: itemKey,
+    issueType:         cfg.issueType,
+    region,
+    editModel:  'gpt-image-1',
+    prompt,
+    preserve:   semantic.preserve || '',
+    avoid:      semantic.avoid    || '',
+    constraints: [
+      'no added detail',
+      'preserve drawing',
+      'no beautification',
+      'painterly verbs only: simplify, group, suppress, anchor, mute',
+    ],
+  };
+}
+
+function refreshEditButtons() {
+  // Remove any stale buttons first (idempotent)
+  aiCritiqueSection.querySelectorAll('.critique-action-btn').forEach(b => b.remove());
+
+  if (!appState.semantic || isReferenceIdeationMode()) return;
+
+  for (const [key, cfg] of Object.entries(CRITIQUE_ITEM_CONFIG)) {
+    const container = cfg.domRef();
+    if (!container || container.hidden) continue;
+    const btn = document.createElement('button');
+    btn.className = 'critique-action-btn';
+    btn.type = 'button';
+    btn.dataset.critiqueKey = key;
+    btn.textContent = '→ suggest edit';
+    container.appendChild(btn);
+  }
+}
+
+function showEditRequestPreview(itemEl, request) {
+  // Close any other open preview first
+  aiCritiqueSection.querySelectorAll('.edit-request-preview').forEach(p => {
+    p.hidden = true;
+  });
+
+  let preview = itemEl.querySelector('.edit-request-preview');
+  if (!preview) {
+    preview = document.createElement('div');
+    preview.className = 'edit-request-preview';
+    itemEl.appendChild(preview);
+  }
+
+  // Toggle: if same item reopened, just close
+  if (!preview.hidden && appState.pendingEditRequest?.editId === request.editId) {
+    preview.hidden = true;
+    appState.pendingEditRequest = null;
+    return;
+  }
+
+  const regionLabel = request.region.mode === 'bbox'
+    ? `${request.region.scopeClass} · ${request.region.description}`
+    : `${request.region.scopeClass} · full image`;
+
+  const firstSentence = (request.prompt.split('.')[0] + '.').trim();
+
+  const rows = [
+    ['Scope',  regionLabel],
+    ['Change', firstSentence],
+    ...(request.preserve ? [['Keep',  request.preserve]] : []),
+    ...(request.avoid    ? [['Avoid', request.avoid]]    : []),
+  ];
+
+  const dl = document.createElement('dl');
+  rows.forEach(([label, value]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value;
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  });
+
+  const applyBtn = document.createElement('button');
+  applyBtn.className = 'btn-apply-edit';
+  applyBtn.type = 'button';
+  applyBtn.disabled = true;
+  applyBtn.title = 'Image edit available in M3';
+  applyBtn.textContent = 'Apply correction';
+
+  const dismissBtn = document.createElement('button');
+  dismissBtn.className = 'btn-dismiss-preview';
+  dismissBtn.type = 'button';
+  dismissBtn.textContent = 'dismiss';
+
+  const actions = document.createElement('div');
+  actions.className = 'preview-actions';
+  actions.appendChild(applyBtn);
+  actions.appendChild(dismissBtn);
+
+  preview.replaceChildren(dl, actions);
+  preview.hidden = false;
+  appState.pendingEditRequest = request;
+
+  dismissBtn.addEventListener('click', () => {
+    preview.hidden = true;
+    appState.pendingEditRequest = null;
+  });
+}
+
+// Delegated click handler for edit buttons in the critique section
+aiCritiqueSection.addEventListener('click', e => {
+  const btn = e.target.closest('.critique-action-btn');
+  if (!btn || !appState.semantic) return;
+  const key     = btn.dataset.critiqueKey;
+  const request = critiqueItemToEditRequest(appState.semantic, key);
+  if (!request) return;
+  const itemEl = btn.closest('.ai-critique-item');
+  showEditRequestPreview(itemEl, request);
+});
+
+function resetPendingEdit() {
+  appState.pendingEditRequest = null;
+  aiCritiqueSection.querySelectorAll('.edit-request-preview').forEach(p => { p.hidden = true; });
 }
 
 function resetMockup() {
@@ -1131,6 +1321,7 @@ async function rerunWorkflowAnalysis() {
   const file = activeImage.file;
   appState.semanticRequestId = requestId;
   appState.semantic = null;
+  resetPendingEdit();
   appState.semanticStatus = {
     source: 'none',
     state: 'loading',
@@ -1196,6 +1387,7 @@ fileInput.addEventListener('change', async () => {
     activeImage.file     = file;
     appState.semantic       = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
+    resetPendingEdit();
     if (supportsAnnotatedMockup()) resetMockup();
 
     showCanvas();
@@ -1233,6 +1425,7 @@ fileInput.addEventListener('change', async () => {
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     appState.semanticRequestId += 1;
+    resetPendingEdit();
     if (supportsAnnotatedMockup()) resetMockup();
     showEmptyState();
   }
@@ -1261,6 +1454,7 @@ resetBtn.addEventListener('click', () => {
   appState.semantic = null;
   appState.semanticStatus = { source: 'none', state: 'unavailable' };
   appState.semanticRequestId += 1;
+  resetPendingEdit();
   if (supportsAnnotatedMockup()) resetMockup();
   showEmptyState();
 });
@@ -1291,6 +1485,7 @@ modeTabs.forEach(tab => {
     appState.displayMode = 'original';
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
+    resetPendingEdit();
     renderCurrentDisplay();
     refreshCanvasToggle();
     if (getActiveImageState().bitmap) {
