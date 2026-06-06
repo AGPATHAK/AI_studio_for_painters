@@ -1642,6 +1642,86 @@ showCompareBtn.addEventListener('click', () => {
   setDisplayMode('compare');
 });
 
+/* ── M5: Print reference sheet ───────────────────────────────────────────── */
+
+function preparePrintSheet() {
+  if (!getActiveImageState().bitmap) return;
+
+  const psFilename = document.getElementById('ps-filename');
+  const psMode     = document.getElementById('ps-mode');
+  const psDate     = document.getElementById('ps-date');
+  const psImages   = document.getElementById('ps-images');
+  const psCritique = document.getElementById('ps-critique');
+
+  // Header
+  psFilename.textContent = getActiveImageState().filename || 'Untitled';
+  psMode.textContent = {
+    'reference-ideation':  'Reference Ideation',
+    'in-progress-guidance': 'In-Process',
+    'finished-review':      'Finished Painting'
+  }[getWorkflowMode()] || '';
+  psDate.textContent = new Date().toLocaleDateString();
+
+  // Images — only slots that have content
+  psImages.replaceChildren();
+  const imageLabel = isReferenceIdeationMode() ? 'Reference Photo'
+    : isFinishedMode() ? 'Finished Painting' : 'WIP Painting';
+
+  const slots = [
+    { label: imageLabel,        src: getActiveImageState().srcUrl },
+    appState.mockup.imageDataUrl
+      ? { label: 'Annotated Mockup', src: appState.mockup.imageDataUrl } : null,
+    appState.correction.imageDataUrl
+      ? { label: 'Correction',       src: appState.correction.imageDataUrl } : null,
+  ].filter(Boolean);
+
+  slots.forEach(({ label, src }) => {
+    const fig = document.createElement('figure');
+    fig.className = 'ps-figure';
+    const cap = document.createElement('figcaption');
+    cap.textContent = label;
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = label;
+    fig.appendChild(cap);
+    fig.appendChild(img);
+    psImages.appendChild(fig);
+  });
+
+  // Critique fields
+  psCritique.replaceChildren();
+  const semantic = appState.semantic;
+  if (!semantic) return;
+
+  if (semantic.priorityDiagnosis) {
+    const p = document.createElement('p');
+    p.className = 'ps-diagnosis';
+    p.textContent = semantic.priorityDiagnosis;
+    psCritique.appendChild(p);
+  }
+
+  [
+    ['Repaint',        semantic.repaintHandoff],
+    ['Preserve',       semantic.preserve],
+    ['Avoid',          semantic.avoid],
+    ['Teaching point', semantic.teachingPoint],
+  ].filter(([, v]) => v).forEach(([label, value]) => {
+    const div = document.createElement('div');
+    div.className = 'ps-field';
+    const lbl = document.createElement('span');
+    lbl.className = 'ps-field-label';
+    lbl.textContent = label;
+    const txt = document.createElement('p');
+    txt.className = 'ps-field-text';
+    txt.textContent = value;
+    div.appendChild(lbl);
+    div.appendChild(txt);
+    psCritique.appendChild(div);
+  });
+}
+
+window.addEventListener('beforeprint', preparePrintSheet);
+
 /* ── Resize re-fit ────────────────────────────────────────────────────────── */
 
 let _resizeTimer = null;

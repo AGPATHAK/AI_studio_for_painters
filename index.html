@@ -185,6 +185,21 @@
 
   </div><!-- /.app-layout -->
 
+  <!-- M5: Reference sheet — hidden on screen, populated + shown in print -->
+  <section class="print-sheet" id="print-sheet">
+    <header class="ps-header">
+      <span class="ps-filename" id="ps-filename"></span>
+      <span class="ps-mode" id="ps-mode"></span>
+      <span class="ps-date" id="ps-date"></span>
+    </header>
+    <div class="ps-images" id="ps-images">
+      <!-- Figures injected by preparePrintSheet() -->
+    </div>
+    <div class="ps-critique" id="ps-critique">
+      <!-- Critique fields injected by preparePrintSheet() -->
+    </div>
+  </section>
+
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
