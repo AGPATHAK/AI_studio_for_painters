@@ -56,7 +56,14 @@ const appState = {
   },
   displayMode: 'original', // original | mockup
   semanticRequestId: 0,
-  pendingEditRequest: null  // edit request staged for M3 execution
+  pendingEditRequest: null,  // edit request staged for M3 execution
+  correction: {
+    status: 'idle',          // idle | loading | succeeded | failed
+    bitmap: null,
+    imageDataUrl: '',
+    error: '',
+    sourceCritiqueKey: null
+  }
 };
 
 /* ── DOM refs ─────────────────────────────────────────────────────────────── */
@@ -71,6 +78,7 @@ const emptyState  = document.getElementById('empty-state');
 const canvasToggle = document.getElementById('canvas-toggle');
 const showOriginalBtn = document.getElementById('show-original-btn');
 const showMockupBtn = document.getElementById('show-mockup-btn');
+const showCorrectionBtn = document.getElementById('show-correction-btn');
 const critiquePanel   = document.getElementById('critique-panel');
 const panelKicker = critiquePanel?.querySelector('.panel-kicker');
 const panelTitle = critiquePanel?.querySelector('.panel-title');
@@ -116,7 +124,7 @@ const aiUncertainty = document.getElementById('ai-uncertainty');
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !modeTabs.length ||
     !canvas || !emptyState || !canvasToggle || !showOriginalBtn ||
-    !showMockupBtn || !critiquePanel || !panelKicker || !panelTitle ||
+    !showMockupBtn || !showCorrectionBtn || !critiquePanel || !panelKicker || !panelTitle ||
     !critiqueMessage ||
     !semanticSource || !mockupBtn || !printBtn || !mockupSection || !mockupStatus ||
     !mockupImage || !mockupDownload ||
@@ -145,7 +153,8 @@ const APP_CONFIG = {
   sameOriginSemanticPath: '/api/semantic',
   sameOriginMockupPath: '/api/mockup',
   sameOriginInProcessPath: '/api/in-process',
-  sameOriginFinishedPath: '/api/finished-critique'
+  sameOriginFinishedPath: '/api/finished-critique',
+  sameOriginImageEditPath: '/api/image-edit'
 };
 
 const WORKFLOW_MODES = {
@@ -266,6 +275,10 @@ function getInProcessEndpoint() {
 
 function getFinishedEndpoint() {
   return getApiEndpoint(APP_CONFIG.sameOriginFinishedPath);
+}
+
+function getImageEditEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginImageEditPath);
 }
 
 function getApiEndpoint(path) {
@@ -959,7 +972,7 @@ function critiqueItemToEditRequest(semantic, itemKey) {
     sourceCritiqueKey: itemKey,
     issueType:         cfg.issueType,
     region,
-    editModel:  'gpt-image-1',
+    editModel:  'gemini',
     prompt,
     preserve:   semantic.preserve || '',
     avoid:      semantic.avoid    || '',
@@ -1036,8 +1049,6 @@ function showEditRequestPreview(itemEl, request) {
   const applyBtn = document.createElement('button');
   applyBtn.className = 'btn-apply-edit';
   applyBtn.type = 'button';
-  applyBtn.disabled = true;
-  applyBtn.title = 'Image edit available in M3';
   applyBtn.textContent = 'Apply correction';
 
   const dismissBtn = document.createElement('button');
@@ -1053,6 +1064,19 @@ function showEditRequestPreview(itemEl, request) {
   preview.replaceChildren(dl, actions);
   preview.hidden = false;
   appState.pendingEditRequest = request;
+
+  applyBtn.addEventListener('click', async () => {
+    applyBtn.disabled = true;
+    applyBtn.textContent = 'Applying…';
+    await requestImageEdit(request);
+    if (appState.correction.status === 'failed') {
+      applyBtn.disabled = false;
+      applyBtn.textContent = 'Retry';
+    } else {
+      preview.hidden = true;
+      appState.pendingEditRequest = null;
+    }
+  });
 
   dismissBtn.addEventListener('click', () => {
     preview.hidden = true;
@@ -1074,6 +1098,80 @@ aiCritiqueSection.addEventListener('click', e => {
 function resetPendingEdit() {
   appState.pendingEditRequest = null;
   aiCritiqueSection.querySelectorAll('.edit-request-preview').forEach(p => { p.hidden = true; });
+  resetCorrection();
+}
+
+function resetCorrection() {
+  if (appState.correction.bitmap) {
+    appState.correction.bitmap.close();
+  }
+  appState.correction = {
+    status: 'idle',
+    bitmap: null,
+    imageDataUrl: '',
+    error: '',
+    sourceCritiqueKey: null
+  };
+  if (appState.displayMode === 'correction') {
+    appState.displayMode = 'original';
+  }
+}
+
+async function requestImageEdit(request) {
+  const sourceImage = getActiveImageState();
+  if (!sourceImage.file) return;
+
+  if (appState.correction.bitmap) {
+    appState.correction.bitmap.close();
+  }
+  appState.correction = {
+    status: 'loading',
+    bitmap: null,
+    imageDataUrl: '',
+    error: '',
+    sourceCritiqueKey: request.sourceCritiqueKey
+  };
+  refreshCanvasToggle();
+
+  try {
+    const imageData = await fileToBase64(sourceImage.file);
+    const response = await fetch(getImageEditEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: imageData,
+        mimeType: sourceImage.file.type,
+        prompt: request.prompt
+      })
+    });
+
+    if (!response.ok) throw new Error(`image-edit endpoint returned ${response.status}`);
+    const payload = await response.json();
+    if (!payload.imageDataUrl) throw new Error('image-edit endpoint returned no image');
+    const correctionBitmap = await imageBitmapFromDataUrl(payload.imageDataUrl);
+
+    appState.correction = {
+      status: 'succeeded',
+      bitmap: correctionBitmap,
+      imageDataUrl: payload.imageDataUrl,
+      error: '',
+      sourceCritiqueKey: request.sourceCritiqueKey
+    };
+    appState.displayMode = 'correction';
+  } catch (err) {
+    console.warn('APS: image edit failed:', err);
+    appState.correction = {
+      status: 'failed',
+      bitmap: null,
+      imageDataUrl: '',
+      error: String(err.message || err),
+      sourceCritiqueKey: request.sourceCritiqueKey
+    };
+    appState.displayMode = 'original';
+  }
+
+  refreshCanvasToggle();
+  renderCurrentDisplay();
 }
 
 function resetMockup() {
@@ -1146,22 +1244,32 @@ function refreshMockupUi() {
 function refreshCanvasToggle() {
   const hasOriginal = !!getActiveImageState().bitmap;
   const hasMockup = supportsAnnotatedMockup() && !!appState.mockup.bitmap;
+  const hasCorrection = !!appState.correction.bitmap;
 
   canvasToggle.hidden = !hasOriginal;
   showOriginalBtn.disabled = !hasOriginal;
   showMockupBtn.disabled = !hasMockup;
+  showCorrectionBtn.hidden = !hasCorrection;
+  showCorrectionBtn.disabled = !hasCorrection;
   showOriginalBtn.classList.toggle('is-active', appState.displayMode === 'original');
   showMockupBtn.classList.toggle('is-active', appState.displayMode === 'mockup');
+  showCorrectionBtn.classList.toggle('is-active', appState.displayMode === 'correction');
 }
 
 function setDisplayMode(mode) {
   if (mode === 'mockup' && !appState.mockup.bitmap) return;
-  appState.displayMode = mode === 'mockup' ? 'mockup' : 'original';
+  if (mode === 'correction' && !appState.correction.bitmap) return;
+  if (mode === 'correction') appState.displayMode = 'correction';
+  else if (mode === 'mockup') appState.displayMode = 'mockup';
+  else appState.displayMode = 'original';
   refreshCanvasToggle();
   renderCurrentDisplay();
 }
 
 function getDisplayBitmap() {
+  if (appState.displayMode === 'correction' && appState.correction.bitmap) {
+    return appState.correction.bitmap;
+  }
   if (supportsAnnotatedMockup() && appState.displayMode === 'mockup' && appState.mockup.bitmap) {
     return appState.mockup.bitmap;
   }
@@ -1506,6 +1614,10 @@ showOriginalBtn.addEventListener('click', () => {
 
 showMockupBtn.addEventListener('click', () => {
   setDisplayMode('mockup');
+});
+
+showCorrectionBtn.addEventListener('click', () => {
+  setDisplayMode('correction');
 });
 
 /* ── Resize re-fit ────────────────────────────────────────────────────────── */

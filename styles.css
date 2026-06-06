@@ -876,8 +876,15 @@ body.transitions-ready {
   color: var(--color-accent-text);
   border: none;
   border-radius: 5px;
-  opacity: 0.4;
-  cursor: not-allowed;
+  cursor: pointer;
+  transition: opacity 0.1s ease;
+}
+.btn-apply-edit:hover:not(:disabled) {
+  opacity: 0.85;
+}
+.btn-apply-edit:disabled {
+  opacity: 0.5;
+  cursor: wait;
 }
 
 .btn-dismiss-preview {

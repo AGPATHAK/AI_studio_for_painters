@@ -200,7 +200,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process',
-      '/api/finished-critique'].includes(url.pathname);
+      '/api/finished-critique', '/api/image-edit'].includes(url.pathname);
 
     if (isApiRequest && req.method === 'OPTIONS') {
       sendApiPreflight(req, res);
@@ -224,6 +224,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/finished-critique') {
       await handleFinishedCritique(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/image-edit') {
+      await handleImageEdit(req, res);
       return;
     }
 
@@ -392,6 +397,95 @@ async function handleFinishedCritique(req, res) {
   });
   console.log('APS proxy: finished critique object created');
   sendApiJson(req, res, 200, critique);
+}
+
+async function handleImageEdit(req, res) {
+  console.log('APS proxy: image-edit request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const image = typeof body.image === 'string' ? body.image.trim() : '';
+  const mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+
+  if (!image || !isSupportedImageMimeType(mimeType)) {
+    sendApiJson(req, res, 400, { error: 'invalid_image' });
+    return;
+  }
+
+  if (!prompt) {
+    sendApiJson(req, res, 400, { error: 'missing_prompt' });
+    return;
+  }
+
+  const result = await callGeminiImageEdit(image, mimeType, prompt);
+  console.log('APS proxy: image edit completed');
+  sendApiJson(req, res, 200, result);
+}
+
+async function callGeminiImageEdit(imageBase64, mimeType, prompt) {
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_IMAGE_MODEL)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { text: prompt },
+            { inline_data: { mime_type: mimeType, data: imageBase64 } }
+          ]
+        }],
+        generationConfig: {
+          responseModalities: ['TEXT', 'IMAGE']
+        }
+      })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || `Gemini image model returned ${response.status}`;
+    throw new Error(message);
+  }
+
+  const parts = payload.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find(part => part.inlineData || part.inline_data);
+  if (!imagePart) {
+    throw new Error('Gemini image model returned no image for edit');
+  }
+
+  const inlineData = imagePart.inlineData || imagePart.inline_data;
+  const data = inlineData.data;
+  const outputMimeType = inlineData.mimeType || inlineData.mime_type || 'image/png';
+  if (!data) {
+    throw new Error('Gemini image model returned empty image data for edit');
+  }
+
+  const notes = parts
+    .map(part => cleanText(part.text, ''))
+    .filter(Boolean)
+    .join(' ');
+
+  return {
+    source: 'gemini',
+    model: GEMINI_IMAGE_MODEL,
+    mimeType: outputMimeType,
+    image: data,
+    imageDataUrl: `data:${outputMimeType};base64,${data}`,
+    notes
+  };
 }
 
 async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
