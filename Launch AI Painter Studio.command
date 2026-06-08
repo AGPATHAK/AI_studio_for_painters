@@ -2,8 +2,9 @@
 # AI Painter Studio — double-click launcher
 # Works on MacBook Air and iMac (same iCloud folder).
 # iPad: open the URL shown under "On your network" in Safari on the same Wi-Fi.
+# Copy this file to the Desktop (or Dock) — it always launches from the project folder.
 
-cd "$(dirname "$0")"
+cd "$HOME/Documents/GitHub/AI_studio_for_painters"
 
 # ── Check Node.js ────────────────────────────────────────────────────────────
 if ! command -v node &>/dev/null; then
