@@ -9,11 +9,13 @@ const http = require('node:http');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const { DOCTRINE } = require('./doctrine.js');
 
 const SERVER_DIR = __dirname;
 const ROOT_DIR = path.resolve(SERVER_DIR, '..');
 const MAX_BODY_BYTES = 30 * 1024 * 1024;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+const PROMPT_VERSION = '2.0';
 
 loadEnv(path.join(SERVER_DIR, '.env'));
 loadEnv(path.join(ROOT_DIR, '.env'));
@@ -27,6 +29,47 @@ const LOCAL_DEV_ALLOWED_ORIGINS = new Set([
   'http://127.0.0.1:8081',
   'http://localhost:8081'
 ]);
+
+const PAINTER_PROFILE = loadPainterProfile(path.join(SERVER_DIR, 'painter-profile.json'));
+
+const INTERMEDIATE_REGISTER_GUARDRAIL = [
+  'The painter is intermediate.',
+  'Never explain how to perform basic techniques (flat wash, wet-in-wet, glazing, drybrush mechanics).',
+  'Assume competent drawing and washes.',
+  'Critique judgment, not execution mechanics, unless a specific passage shows a handling fault worth naming.'
+].join(' ');
+
+function loadPainterProfile(filePath) {
+  try {
+    const raw = fs.readFileSync(filePath, 'utf8');
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn(`APS proxy: painter profile unavailable (${err.message}); continuing without it.`);
+    return null;
+  }
+}
+
+function buildProfileBlock(profile) {
+  if (!profile) return '';
+  const media = Array.isArray(profile.media) ? profile.media.join(' and ') : profile.media;
+  return [
+    `Painter profile: ${profile.skillLevel};`,
+    `${media};`,
+    `works in the ${profile.tradition};`,
+    `values ${profile.values}.`,
+    `Avoid ${profile.avoid}.`,
+    profile.register
+  ].filter(Boolean).join(' ');
+}
+
+function withProfile(basePrompt, { doctrine = false, guardrail = false } = {}) {
+  const parts = [basePrompt];
+  const profileBlock = buildProfileBlock(PAINTER_PROFILE);
+  if (profileBlock) parts.push(profileBlock);
+  if (doctrine) parts.push(DOCTRINE);
+  if (guardrail) parts.push(INTERMEDIATE_REGISTER_GUARDRAIL);
+  return parts.join(' ');
+}
 
 const WORKFLOW_MODES = {
   REFERENCE_IDEATION: 'reference-ideation',
@@ -1041,7 +1084,7 @@ function buildInProcessPrompt(context) {
   ].join('; ');
 
   return [
-    IN_PROCESS_PROMPT,
+    withProfile(IN_PROCESS_PROMPT, { doctrine: true, guardrail: true }),
     '',
     `Context: ${contextLine}.`,
     'For priorityDiagnosis, name the single most structurally important lesson in one or two sentences.',
@@ -1067,7 +1110,7 @@ function buildStudioCheckPrompt(context) {
   ].join('; ');
 
   return [
-    STUDIO_CHECK_PROMPT,
+    withProfile(STUDIO_CHECK_PROMPT, { doctrine: true, guardrail: true }),
     '',
     `Context: ${contextLine}.`,
     'For priorityDiagnosis, name the single most important observation about the near-final painting — what determines signing readiness.',
@@ -1096,7 +1139,7 @@ function buildFinishedCritiquePrompt(context) {
   ].join('; ');
 
   return [
-    FINISHED_CRITIQUE_PROMPT,
+    withProfile(FINISHED_CRITIQUE_PROMPT, { doctrine: true, guardrail: true }),
     '',
     `Context: ${contextLine}.`,
     'For priorityDiagnosis, name the single most important retrospective observation: what most determined whether this painting succeeded or fell short.',
@@ -1146,6 +1189,7 @@ function normalizeSemanticResponse(raw, workflowMode = WORKFLOW_MODES.IN_PROGRES
   return {
     source: 'gemini',
     workflowMode,
+    promptVersion: PROMPT_VERSION,
     sceneSummary: cleanText(safe.sceneSummary, ''),
     priorityDiagnosis: cleanText(safe.priorityDiagnosis, ''),
     sceneRead: cleanText(safe.sceneRead, ''),
@@ -1206,9 +1250,9 @@ function isSupportedImageMimeType(mimeType) {
 
 function promptForWorkflow(workflowMode) {
   if (workflowMode === WORKFLOW_MODES.REFERENCE_IDEATION) {
-    return REFERENCE_IDEATION_PROMPT;
+    return withProfile(REFERENCE_IDEATION_PROMPT);
   }
-  return SEMANTIC_PROMPT;
+  return withProfile(SEMANTIC_PROMPT);
 }
 
 function schemaForWorkflow(workflowMode) {
