@@ -134,6 +134,73 @@ Locked decisions, dated. Append-only. Earlier rows are not edited; they are supe
 
 ---
 
+## D8 — 2026-07-07 — Studio journal stored on disk via the proxy, not client-side
+
+**Decision.** Every successful critique is saved as a JSON file (plus a JPEG thumbnail) under `studio-journal/entries/` on the machine running `server/semantic-proxy.js`. The proxy owns reads and writes (`/api/journal/save`, `/api/journal/list`, `/api/journal/entry`, `/api/journal/update`); the browser only ever calls these endpoints. `studio-journal/` is gitignored — it is local session history, not repo content.
+
+**Why.**
+- The proxy already handles all Gemini calls and holds the filesystem; writing journal entries there needs no new infrastructure.
+- File-based storage needs no database, migration story, or extra dependency, consistent with the project's zero-toolchain posture.
+- Keeping journal data server-side (rather than `localStorage`) means entries survive a browser cache clear and can exceed `localStorage`'s size limits (thumbnails alone would blow past 5–10 MB quickly).
+- The app must degrade gracefully when the proxy is absent (the GitHub Pages case) — a one-time feature-detect probe (`GET /api/journal/list`) at startup hides all journal UI if it fails, so there's no broken state.
+
+**Alternatives rejected.**
+- **`localStorage`/`IndexedDB` on the client.** No thumbnails at scale, no cross-device continuity, and duplicates state the proxy could own more simply.
+- **A real database (SQLite, etc.).** Unjustified complexity for what is, at this scale, a folder of JSON files a painter can inspect directly.
+
+**Revisit when.** Entry counts grow large enough that `fs.readdirSync` + read-all-then-filter (used by `listJournalEntries()`) becomes a real latency problem, or the app needs multi-device sync.
+
+---
+
+## D9 — 2026-07-07 — Painter profile as a server-side JSON file
+
+**Decision.** `server/painter-profile.json` (skill level, media, tradition, values, things to avoid, register) is loaded once at proxy startup and appended to every critique prompt via `withProfile()`. It is a plain file the painter can hand-edit; there is no in-app profile editor.
+
+**Why.**
+- The mentor's voice needs to consistently reflect *this* painter's level and taste (intermediate, British watercolor tradition, Wesson/Seago restraint) rather than a generic critique register — a single static file is the simplest thing that could inject that consistently across all five prompts.
+- Keeping it server-side (not sent from the browser per request) means it can't be tampered with or drift between requests, and costs nothing extra per call.
+- A missing or malformed file degrades gracefully — `loadPainterProfile()` logs a warning and continues with `profileBlock = ''`, never crashing the proxy.
+
+**Alternatives rejected.**
+- **In-app settings UI backed by `localStorage`.** More flexible for multiple users, but this is a single-painter tool; a hand-edited file is lower-ceremony and the profile changes rarely.
+- **Hardcoding the profile text into each prompt.** Would require editing multiple prompt constants for any tone/taste change.
+
+**Revisit when.** The tool needs to support more than one painter profile (e.g. a shared install), at which point this becomes a per-user setting.
+
+---
+
+## D10 — 2026-07-07 — Follow-up chat as a dedicated, scoped proxy endpoint
+
+**Decision.** `POST /api/followup` is a narrow, single-purpose endpoint: image + serialized critique + capped chat history (last 10 turns) + one question, answered in plain text (no JSON schema) by "the same mentor who wrote the critique." It is not a general-purpose chat feature — the prompt explicitly forbids expanding scope beyond the critique's intervention scope or redesigning the painting.
+
+**Why.**
+- A generic chat surface risks turning the tool into a chatbot; scoping every answer to "this painting, this critique" keeps it a mentor, not an assistant.
+- Reusing the existing critique + doctrine + guardrail prompt-injection pattern (`withProfile`) keeps the follow-up voice consistent with the critique voice.
+- Persisting each exchange into the journal entry's existing `chat` array (via the already-shipped `/api/journal/update`) means no new storage schema was needed.
+
+**Alternatives rejected.**
+- **A general "ask anything" chat tab.** Explicitly rejected — it would dilute the tool's identity as a scoped studio mentor rather than a general painting chatbot.
+- **Client-side-only chat (no persistence).** Would lose the transcript on reload and couldn't inform progress-memory distillation later.
+
+**Revisit when.** The tool needs multi-painting conversations (e.g. "compare this to my last three paintings") — at that point the endpoint's single-image, single-critique scoping would need to change.
+
+---
+
+## D11 — 2026-07-07 — Annotated-mockup and correction/edit features kept as-is
+
+**Decision.** The mentor-v2 improvement plan (Phases 1–6) makes no structural changes to the annotated-mockup (`/api/mockup`) or correction/edit (`/api/image-edit`, `buildEditPrompt`) features beyond bounded, surgical prompt-line additions in Phase 6. Owner decision, 2026-07-07.
+
+**Why.**
+- Both features work as shipped; the improvement plan's goal is turning the critique loop into a persistent mentor (profile, journal, chat, progress memory, panel hierarchy), not re-litigating already-working image-generation features.
+- Keeping their scope frozen avoids risk to two Gemini-image-model integrations while six other phases are in flight.
+
+**Alternatives rejected.**
+- **Folding mockup/correction into the same profile+doctrine injection as critiques.** Considered and explicitly out of scope for this plan; would be its own phase if pursued.
+
+**Revisit when.** A future improvement plan specifically targets the mockup or correction/edit experience.
+
+---
+
 ## Open Decisions
 
 These are flagged here so we don't waste time re-discovering them. None block M0; some block specific later milestones.
