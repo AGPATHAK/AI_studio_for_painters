@@ -149,64 +149,73 @@
       </div>
 
       <div class="ai-critique-section" id="ai-critique-section" hidden>
-        <div class="ai-critique-item" id="ai-scene-item">
-          <p class="section-label">Scene read</p>
-          <p id="ai-scene-read"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-value-item">
-          <p class="section-label">Value structure</p>
-          <p id="ai-value-critique"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-focal-item">
-          <p class="section-label">Focal hierarchy</p>
-          <p id="ai-focal-critique"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-edge-item">
-          <p class="section-label">Edges and atmosphere</p>
-          <p id="ai-edge-critique"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-chroma-item">
-          <p class="section-label">Chroma</p>
-          <p id="ai-chroma-critique"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-watercolor-item">
-          <p class="section-label">Watercolor handling</p>
-          <p id="ai-watercolor-handling"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-scope-item">
-          <p class="section-label">Scope</p>
-          <p id="ai-scope"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-demo-item">
-          <p class="section-label">Demonstration</p>
-          <p id="ai-demo"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-teaching-item">
+
+        <!-- Tier 1: priority lesson — always visible -->
+        <div class="ai-critique-item tier-one" id="ai-teaching-item">
           <p class="section-label">Teaching point</p>
           <p id="ai-teaching-point"></p>
         </div>
-        <div class="ai-critique-item" id="ai-repaint-item">
-          <p class="section-label">Repaint handoff</p>
-          <p id="ai-repaint"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-preserve-item">
-          <p class="section-label">Preserve</p>
-          <p id="ai-preserve"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-avoid-item">
-          <p class="section-label">Avoid</p>
-          <p id="ai-avoid"></p>
-        </div>
-        <div class="ai-critique-item" id="ai-uncertainty-item" hidden>
-          <p class="section-label">Uncertainty</p>
-          <p id="ai-uncertainty"></p>
-        </div>
-
-        <!-- Studio Check fields -->
-        <div class="ai-critique-item" id="ai-signing-recommendation-item" hidden>
+        <div class="ai-critique-item tier-one" id="ai-signing-recommendation-item" hidden>
           <p class="section-label">Signing</p>
           <p id="ai-signing-recommendation"></p>
         </div>
+        <div class="ai-critique-item tier-one" id="ai-repaint-item">
+          <p class="section-label">Repaint handoff</p>
+          <p id="ai-repaint"></p>
+        </div>
+        <div class="tier-one-row">
+          <div class="ai-critique-item tier-one" id="ai-preserve-item">
+            <p class="section-label">Preserve</p>
+            <p id="ai-preserve"></p>
+          </div>
+          <div class="ai-critique-item tier-one" id="ai-avoid-item">
+            <p class="section-label">Avoid</p>
+            <p id="ai-avoid"></p>
+          </div>
+        </div>
+
+        <!-- Tier 2: full read — collapsed by default, open for Reference Ideation -->
+        <details class="full-read" id="full-read-details">
+          <summary>Full read — value, focal, edges, chroma, handling</summary>
+          <div class="ai-critique-item" id="ai-scene-item">
+            <p class="section-label">Scene read</p>
+            <p id="ai-scene-read"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-value-item">
+            <p class="section-label">Value structure</p>
+            <p id="ai-value-critique"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-focal-item">
+            <p class="section-label">Focal hierarchy</p>
+            <p id="ai-focal-critique"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-edge-item">
+            <p class="section-label">Edges and atmosphere</p>
+            <p id="ai-edge-critique"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-chroma-item">
+            <p class="section-label">Chroma</p>
+            <p id="ai-chroma-critique"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-watercolor-item">
+            <p class="section-label">Watercolor handling</p>
+            <p id="ai-watercolor-handling"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-scope-item">
+            <p class="section-label">Scope</p>
+            <p id="ai-scope"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-demo-item">
+            <p class="section-label">Demonstration</p>
+            <p id="ai-demo"></p>
+          </div>
+          <div class="ai-critique-item" id="ai-uncertainty-item" hidden>
+            <p class="section-label">Uncertainty</p>
+            <p id="ai-uncertainty"></p>
+          </div>
+        </details>
+
+        <!-- Tier 3: mode extras — always visible -->
         <div class="ai-critique-item" id="ai-final-adjustments-item" hidden>
           <p class="section-label">Final adjustments</p>
           <p id="ai-final-adjustments"></p>
@@ -216,7 +225,6 @@
           <p id="ai-media-options"></p>
         </div>
 
-        <!-- Archive fields -->
         <div class="ai-critique-item" id="ai-strengths-item" hidden>
           <p class="section-label">Strengths</p>
           <p id="ai-strengths"></p>
@@ -245,6 +253,7 @@
   <section class="print-sheet" id="print-sheet">
     <header class="ps-header">
       <span class="ps-filename" id="ps-filename"></span>
+      <span class="ps-title" id="ps-title" hidden></span>
       <span class="ps-mode" id="ps-mode"></span>
       <span class="ps-date" id="ps-date"></span>
     </header>

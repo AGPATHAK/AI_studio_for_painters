@@ -107,6 +107,7 @@ const mockupStatus = document.getElementById('mockup-status');
 const mockupImage = document.getElementById('mockup-image');
 const mockupDownload = document.getElementById('mockup-download');
 const aiCritiqueSection = document.getElementById('ai-critique-section');
+const fullReadDetails = document.getElementById('full-read-details');
 const stepAnalyseHint  = document.getElementById('step-analyse-hint');
 const stepAnnotateHint = document.getElementById('step-annotate-hint');
 const aiSceneItem = document.getElementById('ai-scene-item');
@@ -168,7 +169,7 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !critiqueMessage ||
     !semanticSource || !mockupBtn || !printBtn || !mockupSection || !mockupStatus ||
     !mockupImage || !mockupDownload ||
-    !aiCritiqueSection || !aiSceneItem ||
+    !aiCritiqueSection || !fullReadDetails || !aiSceneItem ||
     !aiSceneRead || !aiValueItem || !aiValueCritique ||
     !aiFocalItem || !aiFocalCritique ||
     !aiEdgeItem || !aiEdgeCritique ||
@@ -225,8 +226,8 @@ const WORKFLOW_COPY = {
     empty: 'Upload a reference photograph to explore painterly possibilities.',
     ready: 'Reference structure is ready. Run ideation when you want painterly directions.',
     action: 'Run ideation',
-    sourceReady: 'Semantic source: Gemini Vision - ideation pass succeeded',
-    sourceUnavailable: 'Semantic source: Gemini Vision - ideation unavailable'
+    sourceReady: 'Mentor: Gemini · ready',
+    sourceUnavailable: 'Mentor: Gemini · unavailable'
   },
   [WORKFLOW_MODES.IN_PROGRESS_GUIDANCE]: {
     kicker: 'In-Process',
@@ -234,8 +235,8 @@ const WORKFLOW_COPY = {
     empty: 'Upload a work-in-progress painting photo to get next-step guidance.',
     ready: 'WIP image is ready. Ask for critique and next painting actions.',
     action: 'Critique WIP',
-    sourceReady: 'Semantic source: Gemini Vision - in-process critique succeeded',
-    sourceUnavailable: 'Semantic source: Gemini Vision - in-process critique unavailable'
+    sourceReady: 'Mentor: Gemini · ready',
+    sourceUnavailable: 'Mentor: Gemini · unavailable'
   },
   [WORKFLOW_MODES.PRE_SIGN]: {
     kicker: 'Studio Check',
@@ -243,8 +244,8 @@ const WORKFLOW_COPY = {
     empty: 'Upload your near-final painting to check what (if anything) to do before signing.',
     ready: 'Painting is ready. Run a studio check to decide whether to sign.',
     action: 'Studio check',
-    sourceReady: 'Semantic source: Gemini Vision - studio check succeeded',
-    sourceUnavailable: 'Semantic source: Gemini Vision - studio check unavailable'
+    sourceReady: 'Mentor: Gemini · ready',
+    sourceUnavailable: 'Mentor: Gemini · unavailable'
   },
   [WORKFLOW_MODES.FINISHED_REVIEW]: {
     kicker: 'Archive',
@@ -252,8 +253,8 @@ const WORKFLOW_COPY = {
     empty: 'Upload a signed painting for a retrospective critique and study record.',
     ready: 'Signed painting is ready. Generate an archive read when you want a studio record.',
     action: 'Archive read',
-    sourceReady: 'Semantic source: Gemini Vision - archive read succeeded',
-    sourceUnavailable: 'Semantic source: Gemini Vision - archive read unavailable'
+    sourceReady: 'Mentor: Gemini · ready',
+    sourceUnavailable: 'Mentor: Gemini · unavailable'
   }
 };
 
@@ -963,21 +964,13 @@ function refreshSemanticSource() {
                            !status.detail);
 
   if (status.state === 'loading') {
-    if (isInProcessMode()) {
-      semanticSource.textContent = 'Semantic source: asking Gemini for WIP critique';
-    } else if (isStudioCheckMode()) {
-      semanticSource.textContent = 'Semantic source: asking Gemini for studio check';
-    } else if (isFinishedMode()) {
-      semanticSource.textContent = 'Semantic source: asking Gemini for archive read';
-    } else {
-      semanticSource.textContent = 'Semantic source: asking Gemini Vision';
-    }
+    semanticSource.textContent = 'Mentor: Gemini · thinking…';
   } else if (status.source === 'gemini') {
     semanticSource.textContent = copy.sourceReady;
   } else if (status.state === 'unavailable') {
     semanticSource.textContent = status.detail || copy.sourceUnavailable;
   } else {
-    semanticSource.textContent = 'Semantic source: waiting for image';
+    semanticSource.textContent = 'Mentor: Gemini · waiting for image';
   }
 }
 
@@ -1126,6 +1119,7 @@ function refreshWorkflowChrome() {
   critiquePanel.dataset.workflow = getWorkflowMode();
   panelKicker.textContent = copy.kicker;
   panelTitle.textContent = copy.title;
+  fullReadDetails.open = isReferenceIdeationMode();
   uploadBtn.textContent = isInProcessMode()
     ? 'Open WIP'
     : (isStudioCheckMode() ? 'Open painting'
@@ -1782,7 +1776,7 @@ function showCanvas() {
   emptyState.hidden   = true;
   resetBtn.disabled   = false;
   critiqueBtn.disabled = false;
-  stepAnalyseHint.textContent = 'Tap to analyse';
+  stepAnalyseHint.textContent = 'Read this reference';
   refreshCanvasToggle();
   refreshWorkflowChrome();
 }
@@ -2041,6 +2035,7 @@ function preparePrintSheet() {
   if (!getActiveImageState().bitmap) return;
 
   const psFilename = document.getElementById('ps-filename');
+  const psTitle    = document.getElementById('ps-title');
   const psMode     = document.getElementById('ps-mode');
   const psDate     = document.getElementById('ps-date');
   const psImages   = document.getElementById('ps-images');
@@ -2048,6 +2043,9 @@ function preparePrintSheet() {
 
   // Header
   psFilename.textContent = getActiveImageState().filename || 'Untitled';
+  const paintingTitle = (journalPaintingTitle.value.trim() || appState.journal.lastPaintingId || '');
+  psTitle.textContent = paintingTitle;
+  psTitle.hidden = !paintingTitle;
   psMode.textContent = {
     'reference-ideation':   'Reference Ideation',
     'in-progress-guidance': 'In-Process',

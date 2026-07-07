@@ -489,8 +489,9 @@ body.transitions-ready {
 
 .panel-copy {
   color: var(--color-text);
-  font-size: 0.88rem;
-  line-height: 1.55;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.5;
 }
 
 .semantic-source {
@@ -650,6 +651,62 @@ body.transitions-ready {
   margin-top: 4px;
 }
 
+/* Tier 1 — priority lesson, always visible */
+.ai-critique-item.tier-one {
+  font-size: 0.92rem;
+}
+
+.tier-one-row {
+  display: flex;
+  gap: 16px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 13px;
+}
+
+.tier-one-row .ai-critique-item {
+  border-top: none;
+  padding-top: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Tier 2 — full read, collapsed by default */
+.full-read {
+  border-top: 1px solid var(--color-border);
+  padding-top: 13px;
+}
+
+.full-read summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  list-style: none;
+}
+
+.full-read summary::-webkit-details-marker {
+  display: none;
+}
+
+.full-read summary::before {
+  content: '▸ ';
+}
+
+.full-read[open] summary::before {
+  content: '▾ ';
+}
+
+.full-read[open] summary {
+  margin-bottom: 13px;
+}
+
+.full-read > .ai-critique-item:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
 /* Workflow tint on the critique panel header */
 .critique-panel[data-workflow="reference-ideation"] .panel-title::after {
   content: " · ideation";
@@ -736,6 +793,16 @@ body.transitions-ready {
     font-size: 8.5pt;
     font-weight: 700;
     color: black;
+  }
+
+  .ps-title {
+    font-size: 8.5pt;
+    font-style: italic;
+    color: #555;
+  }
+
+  .ps-title[hidden] {
+    display: none;
   }
 
   .ps-mode {
