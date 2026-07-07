@@ -39,3 +39,6 @@ scratch/
 reviewer-pack/
 *.reviewer.zip
 .semantic-proxy.log
+
+# Studio journal — local critique history, not part of the repo
+studio-journal/

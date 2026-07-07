@@ -9,6 +9,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const crypto = require('node:crypto');
 const { DOCTRINE } = require('./doctrine.js');
 
 const SERVER_DIR = __dirname;
@@ -16,6 +17,8 @@ const ROOT_DIR = path.resolve(SERVER_DIR, '..');
 const MAX_BODY_BYTES = 30 * 1024 * 1024;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const PROMPT_VERSION = '2.0';
+const JOURNAL_DIR = path.join(ROOT_DIR, 'studio-journal');
+const JOURNAL_ENTRIES_DIR = path.join(JOURNAL_DIR, 'entries');
 
 loadEnv(path.join(SERVER_DIR, '.env'));
 loadEnv(path.join(ROOT_DIR, '.env'));
@@ -355,7 +358,9 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process',
-      '/api/studio-check', '/api/finished-critique', '/api/image-edit'].includes(url.pathname);
+      '/api/studio-check', '/api/finished-critique', '/api/image-edit',
+      '/api/journal/save', '/api/journal/list', '/api/journal/entry',
+      '/api/journal/update'].includes(url.pathname);
 
     if (isApiRequest && req.method === 'OPTIONS') {
       sendApiPreflight(req, res);
@@ -389,6 +394,26 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/image-edit') {
       await handleImageEdit(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/journal/save') {
+      await handleJournalSave(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/journal/list') {
+      await handleJournalList(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/journal/entry') {
+      await handleJournalEntry(req, res, url);
+      return;
+    }
+
+    if (url.pathname === '/api/journal/update') {
+      await handleJournalUpdate(req, res);
       return;
     }
 
@@ -637,6 +662,161 @@ async function handleImageEdit(req, res) {
   const result = await callGeminiImageEdit(image, mimeType, prompt);
   console.log('APS proxy: image edit completed');
   sendApiJson(req, res, 200, result);
+}
+
+async function handleJournalSave(req, res) {
+  console.log('APS proxy: journal save request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const workflowMode = normalizeWorkflowMode(body.workflowMode);
+  const critique = body.critique && typeof body.critique === 'object' ? body.critique : {};
+  const thumbnail = typeof body.thumbnail === 'string' ? body.thumbnail : '';
+
+  ensureJournalDir();
+
+  const id = crypto.randomUUID();
+  const savedAt = new Date().toISOString();
+  const basename = `${formatBasenameTimestamp(new Date())}_${workflowMode}_${id.slice(0, 8)}`;
+
+  const entry = {
+    id,
+    savedAt,
+    workflowMode,
+    filename: cleanText(body.filename, ''),
+    paintingId: body.paintingId ? cleanText(body.paintingId, '') || null : null,
+    promptVersion: cleanText(body.promptVersion, ''),
+    model: cleanText(body.model, ''),
+    critique,
+    userNote: cleanText(body.userNote, ''),
+    userRating: normalizeUserRating(body.userRating),
+    chat: Array.isArray(body.chat) ? body.chat : []
+  };
+
+  fs.writeFileSync(path.join(JOURNAL_ENTRIES_DIR, `${basename}.json`), JSON.stringify(entry, null, 2));
+
+  const thumbMatch = thumbnail.match(/^data:image\/[^;]+;base64,(.+)$/);
+  if (thumbMatch) {
+    fs.writeFileSync(path.join(JOURNAL_ENTRIES_DIR, `${basename}.jpg`), Buffer.from(thumbMatch[1], 'base64'));
+  }
+
+  console.log(`APS proxy: journal entry saved ${basename}`);
+  sendApiJson(req, res, 200, { id });
+}
+
+async function handleJournalList(req, res) {
+  console.log('APS proxy: journal list request received');
+  if (req.method !== 'GET') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  ensureJournalDir();
+
+  const summaries = listJournalEntries()
+    .map(({ entry }) => ({
+      id: entry.id,
+      savedAt: entry.savedAt,
+      workflowMode: entry.workflowMode,
+      filename: entry.filename,
+      paintingId: entry.paintingId,
+      priorityDiagnosis: entry.critique?.priorityDiagnosis || '',
+      userRating: entry.userRating
+    }))
+    .sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
+
+  sendApiJson(req, res, 200, summaries);
+}
+
+async function handleJournalEntry(req, res, url) {
+  console.log('APS proxy: journal entry request received');
+  if (req.method !== 'GET') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  const id = url.searchParams.get('id') || '';
+  ensureJournalDir();
+  const found = findJournalEntryById(id);
+  if (!found) {
+    sendApiJson(req, res, 404, { error: 'not_found' });
+    return;
+  }
+
+  sendApiJson(req, res, 200, found.entry);
+}
+
+async function handleJournalUpdate(req, res) {
+  console.log('APS proxy: journal update request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const id = typeof body.id === 'string' ? body.id : '';
+
+  ensureJournalDir();
+  const found = findJournalEntryById(id);
+  if (!found) {
+    sendApiJson(req, res, 404, { error: 'not_found' });
+    return;
+  }
+
+  const { filePath, entry } = found;
+  if (body.userNote !== undefined) entry.userNote = cleanText(body.userNote, '');
+  if (body.userRating !== undefined) entry.userRating = normalizeUserRating(body.userRating);
+  if (body.paintingId !== undefined) {
+    entry.paintingId = body.paintingId ? cleanText(body.paintingId, '') || null : null;
+  }
+  if (body.chat !== undefined && Array.isArray(body.chat)) entry.chat = body.chat;
+
+  fs.writeFileSync(filePath, JSON.stringify(entry, null, 2));
+  console.log(`APS proxy: journal entry updated ${id}`);
+  sendApiJson(req, res, 200, { ok: true, id });
+}
+
+function ensureJournalDir() {
+  fs.mkdirSync(JOURNAL_ENTRIES_DIR, { recursive: true });
+}
+
+function listJournalEntries() {
+  let files;
+  try {
+    files = fs.readdirSync(JOURNAL_ENTRIES_DIR).filter(f => f.endsWith('.json'));
+  } catch (_err) {
+    return [];
+  }
+
+  return files
+    .map(filename => {
+      const filePath = path.join(JOURNAL_ENTRIES_DIR, filename);
+      try {
+        const entry = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        return { filePath, entry };
+      } catch (err) {
+        console.warn(`APS proxy: skipping unreadable journal entry ${filename}: ${err.message}`);
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
+function findJournalEntryById(id) {
+  if (!id) return null;
+  return listJournalEntries().find(({ entry }) => entry.id === id) || null;
+}
+
+function formatBasenameTimestamp(date) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}${pad(date.getMinutes())}`;
+}
+
+function normalizeUserRating(value) {
+  return ['useful', 'partly', 'off'].includes(value) ? value : null;
 }
 
 async function callGeminiImageEdit(imageBase64, mimeType, prompt) {
@@ -1190,6 +1370,7 @@ function normalizeSemanticResponse(raw, workflowMode = WORKFLOW_MODES.IN_PROGRES
     source: 'gemini',
     workflowMode,
     promptVersion: PROMPT_VERSION,
+    model: GEMINI_MODEL,
     sceneSummary: cleanText(safe.sceneSummary, ''),
     priorityDiagnosis: cleanText(safe.priorityDiagnosis, ''),
     sceneRead: cleanText(safe.sceneRead, ''),

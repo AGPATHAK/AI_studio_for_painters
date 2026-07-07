@@ -119,6 +119,26 @@
         Semantic source: waiting for image
       </p>
 
+      <div class="journal-section" id="journal-section" hidden>
+        <p class="journal-status" id="journal-status"></p>
+        <div class="journal-title-row" id="journal-title-row" hidden>
+          <label for="journal-painting-title">Painting title (links sessions)</label>
+          <input type="text" id="journal-painting-title" placeholder="e.g. Harbour morning">
+        </div>
+        <div class="journal-rating" id="journal-rating-row" hidden>
+          <span class="section-label">Was this useful?</span>
+          <div class="journal-rating-buttons">
+            <button type="button" class="journal-rating-btn" data-rating="useful">Useful</button>
+            <button type="button" class="journal-rating-btn" data-rating="partly">Partly</button>
+            <button type="button" class="journal-rating-btn" data-rating="off">Off</button>
+          </div>
+        </div>
+        <div class="journal-note-row" id="journal-note-row" hidden>
+          <label for="journal-note">What I did about this</label>
+          <textarea id="journal-note" rows="2" placeholder="Notes for next time"></textarea>
+        </div>
+      </div>
+
       <div class="mockup-section" id="mockup-section" hidden>
         <p class="section-label">Annotated mockup</p>
         <p class="mockup-status" id="mockup-status">Waiting for mockup.</p>

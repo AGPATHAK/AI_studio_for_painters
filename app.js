@@ -69,6 +69,11 @@ const appState = {
     imageDataUrl: '',
     error: '',
     sourceCritiqueKey: null
+  },
+  journal: {
+    available: null,   // null = not probed yet | true | false
+    entries: [],        // cached /api/journal/list summaries, newest first
+    currentEntryId: null
   }
 };
 
@@ -143,6 +148,14 @@ const aiNextExplItem = document.getElementById('ai-next-exploration-item');
 const aiNextExploration = document.getElementById('ai-next-exploration');
 const aiExhibitionItem = document.getElementById('ai-exhibition-note-item');
 const aiExhibitionNote = document.getElementById('ai-exhibition-note');
+const journalSection = document.getElementById('journal-section');
+const journalStatus = document.getElementById('journal-status');
+const journalTitleRow = document.getElementById('journal-title-row');
+const journalPaintingTitle = document.getElementById('journal-painting-title');
+const journalRatingRow = document.getElementById('journal-rating-row');
+const journalRatingBtns = document.querySelectorAll('.journal-rating-btn');
+const journalNoteRow = document.getElementById('journal-note-row');
+const journalNote = document.getElementById('journal-note');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
@@ -171,7 +184,9 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !aiStrengthsItem || !aiStrengths ||
     !aiStudyAreasItem || !aiStudyAreas ||
     !aiNextExplItem || !aiNextExploration ||
-    !aiExhibitionItem || !aiExhibitionNote) {
+    !aiExhibitionItem || !aiExhibitionNote ||
+    !journalSection || !journalStatus || !journalTitleRow || !journalPaintingTitle ||
+    !journalRatingRow || !journalRatingBtns.length || !journalNoteRow || !journalNote) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -188,7 +203,11 @@ const APP_CONFIG = {
   sameOriginInProcessPath: '/api/in-process',
   sameOriginStudioCheckPath: '/api/studio-check',
   sameOriginFinishedPath: '/api/finished-critique',
-  sameOriginImageEditPath: '/api/image-edit'
+  sameOriginImageEditPath: '/api/image-edit',
+  sameOriginJournalSavePath: '/api/journal/save',
+  sameOriginJournalListPath: '/api/journal/list',
+  sameOriginJournalEntryPath: '/api/journal/entry',
+  sameOriginJournalUpdatePath: '/api/journal/update'
 };
 
 const WORKFLOW_MODES = {
@@ -329,6 +348,18 @@ function getImageEditEndpoint() {
   return getApiEndpoint(APP_CONFIG.sameOriginImageEditPath);
 }
 
+function getJournalSaveEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginJournalSavePath);
+}
+
+function getJournalListEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginJournalListPath);
+}
+
+function getJournalUpdateEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginJournalUpdatePath);
+}
+
 function getApiEndpoint(path) {
   const isLocalFrontend =
     ['127.0.0.1', 'localhost'].includes(window.location.hostname) &&
@@ -401,7 +432,9 @@ function normalizeSemanticInterpretation(raw) {
     suppress: cleanUiText(safe.suppress),
     emphasize: cleanUiText(safe.emphasize),
     abstractionOpportunities: cleanUiText(safe.abstractionOpportunities),
-    uncertaintyNote: cleanUiText(safe.uncertaintyNote)
+    uncertaintyNote: cleanUiText(safe.uncertaintyNote),
+    promptVersion: cleanUiText(safe.promptVersion),
+    model: cleanUiText(safe.model)
   };
 }
 
@@ -410,6 +443,8 @@ function normalizeInProcessCritique(raw) {
   return {
     source: safe.source || 'gemini',
     workflowMode: WORKFLOW_MODES.IN_PROGRESS_GUIDANCE,
+    promptVersion: cleanUiText(safe.promptVersion),
+    model: cleanUiText(safe.model),
     priorityDiagnosis: cleanUiText(safe.priorityDiagnosis),
     sceneRead: cleanUiText(safe.sceneRead),
     valueStructureCritique: cleanUiText(safe.valueStructureCritique),
@@ -433,6 +468,8 @@ function normalizeFinishedCritique(raw) {
   return {
     source: safe.source || 'gemini',
     workflowMode: WORKFLOW_MODES.FINISHED_REVIEW,
+    promptVersion: cleanUiText(safe.promptVersion),
+    model: cleanUiText(safe.model),
     priorityDiagnosis: cleanUiText(safe.priorityDiagnosis),
     sceneRead: cleanUiText(safe.sceneRead),
     valueStructureCritique: cleanUiText(safe.valueStructureCritique),
@@ -460,6 +497,8 @@ function normalizeStudioCheckCritique(raw) {
   return {
     source: safe.source || 'gemini',
     workflowMode: WORKFLOW_MODES.PRE_SIGN,
+    promptVersion: cleanUiText(safe.promptVersion),
+    model: cleanUiText(safe.model),
     priorityDiagnosis: cleanUiText(safe.priorityDiagnosis),
     sceneRead: cleanUiText(safe.sceneRead),
     valueStructureCritique: cleanUiText(safe.valueStructureCritique),
@@ -774,6 +813,129 @@ function fileToBase64(file) {
     reader.readAsDataURL(file);
   });
 }
+
+/* ── Studio journal ───────────────────────────────────────────────────────── */
+
+async function initJournalFeatureDetection() {
+  try {
+    const response = await fetch(getJournalListEndpoint(), { method: 'GET' });
+    if (!response.ok) throw new Error(`journal list returned ${response.status}`);
+    const entries = await response.json();
+    appState.journal.available = true;
+    appState.journal.entries = Array.isArray(entries) ? entries : [];
+  } catch (err) {
+    console.warn('APS: studio journal unavailable:', err);
+    appState.journal.available = false;
+    journalSection.hidden = true;
+  }
+}
+
+function findPreviousPaintingId(filename) {
+  if (!filename) return '';
+  const match = appState.journal.entries.find(e => e.filename === filename && e.paintingId);
+  return match ? match.paintingId : '';
+}
+
+function makeThumbnailDataUrl(bitmap) {
+  const longest = Math.max(bitmap.width, bitmap.height);
+  const scale = Math.min(1, 800 / longest);
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const off = document.createElement('canvas');
+  off.width = w;
+  off.height = h;
+  off.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+  return off.toDataURL('image/jpeg', 0.85);
+}
+
+function setActiveRatingButton(rating) {
+  journalRatingBtns.forEach(btn => {
+    btn.classList.toggle('is-active', btn.dataset.rating === rating);
+  });
+}
+
+function hideJournalSection() {
+  appState.journal.currentEntryId = null;
+  journalSection.hidden = true;
+  journalTitleRow.hidden = true;
+  journalRatingRow.hidden = true;
+  journalNoteRow.hidden = true;
+  journalPaintingTitle.value = '';
+  journalNote.value = '';
+  setActiveRatingButton(null);
+}
+
+async function saveJournalEntry(semantic, imageState, workflowMode) {
+  if (!appState.journal.available) return;
+
+  try {
+    const thumbnail = imageState.bitmap ? makeThumbnailDataUrl(imageState.bitmap) : '';
+    const prefill = findPreviousPaintingId(imageState.filename);
+    const paintingId = (journalPaintingTitle.value.trim() || prefill || null);
+
+    const response = await fetch(getJournalSaveEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workflowMode,
+        filename: imageState.filename || '',
+        paintingId,
+        promptVersion: semantic.promptVersion || '',
+        model: semantic.model || '',
+        critique: semantic,
+        thumbnail,
+        userNote: '',
+        userRating: null,
+        chat: []
+      })
+    });
+    if (!response.ok) throw new Error(`journal save returned ${response.status}`);
+    const result = await response.json();
+
+    appState.journal.currentEntryId = result.id;
+    journalPaintingTitle.value = paintingId || '';
+    journalNote.value = '';
+    setActiveRatingButton(null);
+    journalStatus.textContent = 'Saved to studio journal';
+    journalSection.hidden = false;
+    journalTitleRow.hidden = false;
+    journalRatingRow.hidden = false;
+    journalNoteRow.hidden = false;
+  } catch (err) {
+    console.warn('APS: journal save failed:', err);
+    appState.journal.currentEntryId = null;
+    journalStatus.textContent = 'Journal unavailable (proxy offline)';
+    journalSection.hidden = false;
+    journalTitleRow.hidden = true;
+    journalRatingRow.hidden = true;
+    journalNoteRow.hidden = true;
+  }
+}
+
+function updateJournalEntry(fields) {
+  if (!appState.journal.available || !appState.journal.currentEntryId) return;
+  fetch(getJournalUpdateEndpoint(), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: appState.journal.currentEntryId, ...fields })
+  }).catch(err => console.warn('APS: journal update failed:', err));
+}
+
+journalRatingBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const rating = btn.dataset.rating;
+    setActiveRatingButton(rating);
+    updateJournalEntry({ userRating: rating });
+  });
+});
+
+journalNote.addEventListener('blur', () => {
+  updateJournalEntry({ userNote: journalNote.value });
+});
+
+journalPaintingTitle.addEventListener('blur', () => {
+  updateJournalEntry({ paintingId: journalPaintingTitle.value.trim() || null });
+});
 
 function refreshSemanticSource() {
   const status = appState.semanticStatus;
@@ -1656,6 +1818,7 @@ async function rerunWorkflowAnalysis() {
           : 'Semantic source: asking Gemini Vision'))
   };
   if (isReferenceIdeationMode()) resetMockup();
+  hideJournalSection();
   refreshCritiquePanel('loading');
 
   const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
@@ -1667,6 +1830,9 @@ async function rerunWorkflowAnalysis() {
   appState.semantic = semanticResult.semantic;
   appState.semanticStatus = semanticResult.status;
   refreshCritiquePanel('analysis-ready');
+  if (semanticResult.status.source === 'gemini') {
+    saveJournalEntry(appState.semantic, activeImage, getWorkflowMode());
+  }
 }
 
 /* ── File upload ──────────────────────────────────────────────────────────── */
@@ -1713,6 +1879,7 @@ fileInput.addEventListener('change', async () => {
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     resetPendingEdit();
     if (supportsAnnotatedMockup()) resetMockup();
+    hideJournalSection();
 
     showCanvas();
     renderCurrentDisplay();
@@ -1735,6 +1902,9 @@ fileInput.addEventListener('change', async () => {
 
     console.log(`APS: critique render trigger from semantic completion #${requestId}`);
     refreshCritiquePanel('analysis-ready');
+    if (semanticResult.status.source === 'gemini') {
+      saveJournalEntry(appState.semantic, activeImage, getWorkflowMode());
+    }
 
   } catch (err) {
     console.error('APS: failed to decode image:', err);
@@ -1784,6 +1954,7 @@ resetBtn.addEventListener('click', () => {
   appState.semanticRequestId += 1;
   resetPendingEdit();
   if (supportsAnnotatedMockup()) resetMockup();
+  hideJournalSection();
   showEmptyState();
 });
 
@@ -1814,6 +1985,7 @@ modeTabs.forEach(tab => {
     appState.semantic = null;
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     resetPendingEdit();
+    hideJournalSection();
     renderCurrentDisplay();
     refreshCanvasToggle();
     if (getActiveImageState().bitmap) {
@@ -1959,3 +2131,4 @@ window.addEventListener('resize', () => {
 initTheme();
 setActiveTab(getWorkflowMode());
 showEmptyState();
+initJournalFeatureDetection();
