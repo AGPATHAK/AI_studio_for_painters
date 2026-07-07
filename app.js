@@ -893,6 +893,15 @@ async function saveJournalEntry(semantic, imageState, workflowMode) {
     const result = await response.json();
 
     appState.journal.currentEntryId = result.id;
+    appState.journal.entries.unshift({
+      id: result.id,
+      savedAt: new Date().toISOString(),
+      workflowMode,
+      filename: imageState.filename || '',
+      paintingId,
+      priorityDiagnosis: semantic.priorityDiagnosis || '',
+      userRating: null
+    });
     journalPaintingTitle.value = paintingId || '';
     journalNote.value = '';
     setActiveRatingButton(null);
@@ -914,6 +923,13 @@ async function saveJournalEntry(semantic, imageState, workflowMode) {
 
 function updateJournalEntry(fields) {
   if (!appState.journal.available || !appState.journal.currentEntryId) return;
+
+  const cached = appState.journal.entries.find(e => e.id === appState.journal.currentEntryId);
+  if (cached) {
+    if (fields.paintingId !== undefined) cached.paintingId = fields.paintingId;
+    if (fields.userRating !== undefined) cached.userRating = fields.userRating;
+  }
+
   fetch(getJournalUpdateEndpoint(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
