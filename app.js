@@ -73,7 +73,8 @@ const appState = {
   journal: {
     available: null,   // null = not probed yet | true | false
     entries: [],        // cached /api/journal/list summaries, newest first
-    currentEntryId: null
+    currentEntryId: null,
+    lastPaintingId: ''  // most recent title typed this session, across any filename
   }
 };
 
@@ -871,7 +872,7 @@ async function saveJournalEntry(semantic, imageState, workflowMode) {
   try {
     const thumbnail = imageState.bitmap ? makeThumbnailDataUrl(imageState.bitmap) : '';
     const prefill = findPreviousPaintingId(imageState.filename);
-    const paintingId = (journalPaintingTitle.value.trim() || prefill || null);
+    const paintingId = (journalPaintingTitle.value.trim() || prefill || appState.journal.lastPaintingId || null);
 
     const response = await fetch(getJournalSaveEndpoint(), {
       method: 'POST',
@@ -902,6 +903,7 @@ async function saveJournalEntry(semantic, imageState, workflowMode) {
       priorityDiagnosis: semantic.priorityDiagnosis || '',
       userRating: null
     });
+    if (paintingId) appState.journal.lastPaintingId = paintingId;
     journalPaintingTitle.value = paintingId || '';
     journalNote.value = '';
     setActiveRatingButton(null);
@@ -929,6 +931,7 @@ function updateJournalEntry(fields) {
     if (fields.paintingId !== undefined) cached.paintingId = fields.paintingId;
     if (fields.userRating !== undefined) cached.userRating = fields.userRating;
   }
+  if (fields.paintingId) appState.journal.lastPaintingId = fields.paintingId;
 
   fetch(getJournalUpdateEndpoint(), {
     method: 'POST',
