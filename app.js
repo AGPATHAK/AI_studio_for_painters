@@ -1796,6 +1796,7 @@ function buildEditPrompt(issueType, diagnosis, preserve, avoid) {
     preserve ? `Preserve: ${preserve}.` : '',
     avoid    ? `Avoid: ${avoid}.`       : '',
     'Do not add detail, texture, or finish. Do not beautify. Painterly simplification only.',
+    "Render the change as a painter's rough demonstration, not a polished finish.",
   ].filter(Boolean).join(' ');
 }
 

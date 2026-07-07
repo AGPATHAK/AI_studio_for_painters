@@ -284,7 +284,8 @@ const ANNOTATED_MOCKUP_PROMPT = [
   'Show stronger value grouping, clearer focal hierarchy, reduced clutter, edge hierarchy, and compositional movement.',
   'Prefer restraint: broad connected shapes, value compression, lost edges, selective accents, and Wesson-like economy without imitation.',
   'Do not make fantasy art, photoreal enhancement, style-transfer imitation, unrelated repainting, or a polished finished painting.',
-  'Keep labels legible and sparse. The result should look like a painter marked up a planning print before starting a painting.'
+  'Keep labels legible and sparse. The result should look like a painter marked up a planning print before starting a painting.',
+  'Annotation marks must be clearly graphic (drawn arrows, circles, hatching, text labels) and must not blend into or repaint the underlying image.'
 ].join(' ');
 
 const IN_PROCESS_PROMPT = [
@@ -304,6 +305,7 @@ const IN_PROCESS_PROMPT = [
   'and identify the protected passages before prescribing anything.',
   'AI tightness bias: your guidance must not push the painting toward more explicit edges, more separated forms, or digital tightness.',
   'Preserve ambiguity, atmospheric merging, and lost edges where they serve the painting.',
+  "The painter's stylistic north star is the restraint of Wesson and Seago: big connected washes, economy of statement, muted chroma, atmosphere over description. Judge finish level against that standard, not against realist completeness.",
   'Close with one transferable teaching point that the painter can carry into future work beyond this image.',
   'Return JSON only, in the requested field order. Each field should be concise but actionable in the studio.'
 ].join(' ');
@@ -318,6 +320,7 @@ const STUDIO_CHECK_PROMPT = [
   'AI tightness bias: do not push toward more explicit edges, more separated forms, or digital tightness.',
   'Anti-spiral guard: if no adjustment is worth the risk of overworking the painting, say so directly.',
   'The painting should stop is a complete and valid answer.',
+  "The painter's stylistic north star is the restraint of Wesson and Seago: big connected washes, economy of statement, muted chroma, atmosphere over description. Judge finish level against that standard, not against realist completeness.",
   'For signingRecommendation, give a direct verdict — sign now (with brief reason),',
   'one adjustment first (name the passage and the action), or step back (only if something structural is genuinely still wrong).',
   'No hedging; one clear direction.',
@@ -1362,7 +1365,7 @@ async function callGeminiFinishedPass(context) {
           response_mime_type: 'application/json',
           response_schema: ARCHIVE_SCHEMA,
           temperature: 0.25,
-          max_output_tokens: 3200
+          max_output_tokens: 4096
         }
       })
     }
@@ -1450,7 +1453,7 @@ async function callGeminiStudioCheckPass(context) {
           response_mime_type: 'application/json',
           response_schema: STUDIO_CHECK_SCHEMA,
           temperature: 0.2,
-          max_output_tokens: 3200
+          max_output_tokens: 4096
         }
       })
     }
