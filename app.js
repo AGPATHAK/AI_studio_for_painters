@@ -74,12 +74,15 @@ const appState = {
     available: null,   // null = not probed yet | true | false
     entries: [],        // cached /api/journal/list summaries, newest first
     currentEntryId: null,
-    lastPaintingId: ''  // most recent title typed this session, across any filename
+    lastPaintingId: '', // most recent title typed this session, across any filename
+    progressSummary: null,   // cached /api/journal/distill result | null
+    usePreviousSession: false // painter opted in to same-painting continuity for the next request
   },
   chat: {
     turns: [],   // { role: 'painter' | 'mentor', text }
     sending: false
-  }
+  },
+  view: 'workflow' // 'workflow' | 'journal' -- a UI view, not a workflow mode
 };
 
 /* ── DOM refs ─────────────────────────────────────────────────────────────── */
@@ -167,6 +170,21 @@ const chatTranscript = document.getElementById('chat-transcript');
 const chatStatus = document.getElementById('chat-status');
 const chatInput = document.getElementById('chat-input');
 const chatSendBtn = document.getElementById('chat-send-btn');
+const studioStage = document.querySelector('.studio-stage');
+const journalViewBtn = document.getElementById('journal-view-btn');
+const journalViewPanel = document.getElementById('journal-view-panel');
+const refreshSummaryBtn = document.getElementById('refresh-summary-btn');
+const progressGeneratedAt = document.getElementById('progress-generated-at');
+const progressEmpty = document.getElementById('progress-empty');
+const progressSections = document.getElementById('progress-sections');
+const progressPersistentList = document.getElementById('progress-persistent-list');
+const progressImprovingList = document.getElementById('progress-improving-list');
+const progressStrengthsList = document.getElementById('progress-strengths-list');
+const journalEntryList = document.getElementById('journal-entry-list');
+const journalEntryListEmpty = document.getElementById('journal-entry-list-empty');
+const prevSessionsBlock = document.getElementById('prev-sessions-block');
+const prevSessionsLabel = document.getElementById('prev-sessions-label');
+const prevSessionsCheckbox = document.getElementById('prev-sessions-checkbox');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
@@ -198,7 +216,12 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !aiExhibitionItem || !aiExhibitionNote ||
     !journalSection || !journalStatus || !journalTitleRow || !journalPaintingTitle ||
     !journalRatingRow || !journalRatingBtns.length || !journalNoteRow || !journalNote ||
-    !chatSection || !chatTranscript || !chatStatus || !chatInput || !chatSendBtn) {
+    !chatSection || !chatTranscript || !chatStatus || !chatInput || !chatSendBtn ||
+    !studioStage || !journalViewBtn || !journalViewPanel || !refreshSummaryBtn ||
+    !progressGeneratedAt || !progressEmpty || !progressSections ||
+    !progressPersistentList || !progressImprovingList || !progressStrengthsList ||
+    !journalEntryList || !journalEntryListEmpty ||
+    !prevSessionsBlock || !prevSessionsLabel || !prevSessionsCheckbox) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -220,7 +243,9 @@ const APP_CONFIG = {
   sameOriginJournalListPath: '/api/journal/list',
   sameOriginJournalEntryPath: '/api/journal/entry',
   sameOriginJournalUpdatePath: '/api/journal/update',
-  sameOriginFollowupPath: '/api/followup'
+  sameOriginFollowupPath: '/api/followup',
+  sameOriginJournalDistillPath: '/api/journal/distill',
+  sameOriginJournalProgressPath: '/api/journal/progress'
 };
 
 const WORKFLOW_MODES = {
@@ -375,6 +400,18 @@ function getJournalUpdateEndpoint() {
 
 function getFollowupEndpoint() {
   return getApiEndpoint(APP_CONFIG.sameOriginFollowupPath);
+}
+
+function getJournalEntryEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginJournalEntryPath);
+}
+
+function getJournalDistillEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginJournalDistillPath);
+}
+
+function getJournalProgressEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginJournalProgressPath);
 }
 
 function getApiEndpoint(path) {
@@ -661,6 +698,7 @@ async function requestInProcessCritique(file, bitmap, requestId) {
       workflowMode: WORKFLOW_MODES.IN_PROGRESS_GUIDANCE
     };
 
+    addPreviousEntryId(body);
     await addOptionalContextImages(body);
 
     const response = await fetch(getInProcessEndpoint(), {
@@ -769,6 +807,7 @@ async function requestStudioCheckCritique(file, bitmap, requestId) {
       workflowMode: WORKFLOW_MODES.PRE_SIGN
     };
 
+    addPreviousEntryId(body);
     await addOptionalContextImages(body);
 
     const response = await fetch(getStudioCheckEndpoint(), {
@@ -840,10 +879,12 @@ async function initJournalFeatureDetection() {
     const entries = await response.json();
     appState.journal.available = true;
     appState.journal.entries = Array.isArray(entries) ? entries : [];
+    journalViewBtn.hidden = false;
   } catch (err) {
     console.warn('APS: studio journal unavailable:', err);
     appState.journal.available = false;
     journalSection.hidden = true;
+    journalViewBtn.hidden = true;
   }
 }
 
@@ -1064,6 +1105,318 @@ chatInput.addEventListener('keydown', e => {
     sendChatMessage();
   }
 });
+
+/* ── Journal view (progress memory) ──────────────────────────────────────── */
+
+const MODE_LABELS = {
+  'reference-ideation': 'Reference',
+  'in-progress-guidance': 'In-Process',
+  'pre-sign': 'Studio Check',
+  'finished-review': 'Archive'
+};
+
+const RATING_LABELS = { useful: 'Useful', partly: 'Partly useful', off: 'Off' };
+
+function formatDateDDMMYYYY(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${pad(d.getDate())}-${pad(d.getMonth() + 1)}-${d.getFullYear()}`;
+}
+
+function getCritiqueFieldRows(critique, workflowMode) {
+  const c = critique || {};
+  const isFinished = workflowMode === WORKFLOW_MODES.FINISHED_REVIEW;
+  const isStudioCheck = workflowMode === WORKFLOW_MODES.PRE_SIGN;
+
+  if (workflowMode === WORKFLOW_MODES.REFERENCE_IDEATION) {
+    return [
+      ['Dominant read', c.dominantRead || c.sceneRead],
+      ['Dominant value masses', c.valueMasses],
+      ['Atmosphere and edge economy', c.atmosphereOpportunities],
+      ['Crop / composition ideas', [c.cropIdeas, c.focalHierarchy].filter(Boolean).join(' ')],
+      ['Wesson-esque simplification', [c.simplificationIdea, c.abstractionOpportunities].filter(Boolean).join(' ')],
+      ['Palette / mood direction', [c.paletteDirection, c.moodPossibilities].filter(Boolean).join(' ')],
+      ['Emphasize', c.emphasize],
+      ['Suppress', c.suppress],
+      ['Uncertainty', c.uncertaintyNote]
+    ].filter(([, text]) => text);
+  }
+
+  const rows = [
+    ['Priority diagnosis', c.priorityDiagnosis],
+    [isFinished ? 'First read' : 'Scene read', c.sceneRead],
+    ['Value structure', c.valueStructureCritique],
+    ['Focal hierarchy', c.focalHierarchyCritique],
+    [isFinished ? 'Edges — retrospective' : 'Edges and atmosphere', c.edgeAtmosphereCritique],
+    ['Chroma', c.chromaHierarchyCritique],
+    ['Watercolor handling', c.watercolorHandling],
+    [isStudioCheck ? 'Final adjustment scope' : (isFinished ? 'Resolution level' : 'Scope'), c.interventionScope],
+    [(isStudioCheck || isFinished) ? 'Last test' : 'Demonstration', c.demonstrationDescription],
+    ['Teaching point', c.teachingPoint],
+    ...(isStudioCheck ? [['Signing', c.signingRecommendation]] : []),
+    [isStudioCheck ? 'Final actions' : (isFinished ? 'Final verdict' : 'Repaint handoff'), c.repaintHandoff],
+    [isFinished ? 'What succeeded' : 'Preserve', c.preserve],
+    [isFinished ? 'What weakened it' : 'Avoid', c.avoid],
+    ['Uncertainty', c.uncertaintyNote],
+    ...(isStudioCheck ? [
+      ['Final adjustments', c.finalAdjustments],
+      ['Media options', c.mediaOptions]
+    ] : []),
+    ...(isFinished ? [
+      ['Strengths', c.strengths],
+      ['Study areas', c.studyAreas],
+      ['Next exploration', c.nextExploration],
+      ['Exhibition', c.exhibitionNote]
+    ] : [])
+  ];
+
+  return rows.filter(([, text]) => text);
+}
+
+function buildCritiqueFieldsDl(critique, workflowMode) {
+  const dl = document.createElement('dl');
+  dl.className = 'journal-entry-fields';
+  getCritiqueFieldRows(critique, workflowMode).forEach(([label, text]) => {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = text;
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  });
+  return dl;
+}
+
+function showWorkflowView() {
+  appState.view = 'workflow';
+  studioStage.hidden = false;
+  critiquePanel.hidden = false;
+  journalViewPanel.hidden = true;
+  journalViewBtn.classList.remove('is-active');
+}
+
+function showJournalView() {
+  appState.view = 'journal';
+  studioStage.hidden = true;
+  critiquePanel.hidden = true;
+  journalViewPanel.hidden = false;
+  journalViewBtn.classList.add('is-active');
+  modeTabs.forEach(t => t.classList.remove('is-active'));
+  renderJournalView();
+}
+
+journalViewBtn.addEventListener('click', () => {
+  if (appState.view !== 'journal') showJournalView();
+});
+
+function fillList(ul, items) {
+  ul.replaceChildren();
+  (items || []).forEach(text => {
+    const li = document.createElement('li');
+    li.textContent = text;
+    ul.appendChild(li);
+  });
+}
+
+function renderProgressCard(summary) {
+  const hasSummary = !!(summary && summary.generatedAt);
+  progressEmpty.hidden = hasSummary;
+  progressSections.hidden = !hasSummary;
+  if (!hasSummary) {
+    progressGeneratedAt.textContent = '';
+    return;
+  }
+  progressGeneratedAt.textContent =
+    `Last updated ${formatDateDDMMYYYY(summary.generatedAt)} · ${summary.entryCount} ${summary.entryCount === 1 ? 'entry' : 'entries'}`;
+  fillList(progressPersistentList, summary.persistentDevelopmentAreas);
+  fillList(progressImprovingList, summary.improvingAreas);
+  fillList(progressStrengthsList, summary.establishedStrengths);
+}
+
+refreshSummaryBtn.addEventListener('click', async () => {
+  refreshSummaryBtn.disabled = true;
+  refreshSummaryBtn.textContent = 'Refreshing…';
+  try {
+    const response = await fetch(getJournalDistillEndpoint(), { method: 'POST' });
+    if (!response.ok) throw new Error(`distill returned ${response.status}`);
+    const summary = await response.json();
+    appState.journal.progressSummary = summary;
+    renderProgressCard(summary);
+  } catch (err) {
+    console.warn('APS: refresh summary failed:', err);
+    progressGeneratedAt.textContent = 'Could not refresh summary. Save a few more critiques and try again.';
+  } finally {
+    refreshSummaryBtn.disabled = false;
+    refreshSummaryBtn.textContent = 'Refresh summary';
+  }
+});
+
+async function toggleJournalEntry(id, wrapper, expandedEl) {
+  const isOpen = !expandedEl.hidden;
+  if (isOpen) {
+    expandedEl.hidden = true;
+    wrapper.classList.remove('is-expanded');
+    return;
+  }
+
+  journalEntryList.querySelectorAll('.journal-entry-expanded').forEach(el => { el.hidden = true; });
+  journalEntryList.querySelectorAll('.journal-entry.is-expanded').forEach(el => el.classList.remove('is-expanded'));
+
+  wrapper.classList.add('is-expanded');
+  expandedEl.hidden = false;
+  expandedEl.replaceChildren(Object.assign(document.createElement('p'), {
+    className: 'journal-entry-loading',
+    textContent: 'Loading…'
+  }));
+
+  try {
+    const response = await fetch(`${getJournalEntryEndpoint()}?id=${encodeURIComponent(id)}`);
+    if (!response.ok) throw new Error(`entry fetch returned ${response.status}`);
+    const entry = await response.json();
+    expandedEl.replaceChildren(buildCritiqueFieldsDl(entry.critique || {}, entry.workflowMode));
+  } catch (err) {
+    console.warn('APS: journal entry fetch failed:', err);
+    expandedEl.replaceChildren(Object.assign(document.createElement('p'), {
+      className: 'journal-entry-loading',
+      textContent: 'Could not load this entry.'
+    }));
+  }
+}
+
+function buildJournalEntryRow(summary) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'journal-entry';
+  wrapper.dataset.id = summary.id;
+
+  const row = document.createElement('div');
+  row.className = 'journal-entry-row';
+
+  const thumb = document.createElement('img');
+  thumb.className = 'journal-entry-thumb';
+  thumb.alt = '';
+  if (summary.thumbnailUrl) thumb.src = summary.thumbnailUrl;
+
+  const info = document.createElement('div');
+  info.className = 'journal-entry-summary';
+
+  const meta = document.createElement('p');
+  meta.className = 'journal-entry-meta';
+  const modeLabel = MODE_LABELS[summary.workflowMode] || summary.workflowMode;
+  meta.textContent = [formatDateDDMMYYYY(summary.savedAt), modeLabel, summary.paintingId || summary.filename]
+    .filter(Boolean).join(' · ');
+
+  const diagnosis = document.createElement('p');
+  diagnosis.className = 'journal-entry-diagnosis';
+  diagnosis.textContent = summary.priorityDiagnosis || '';
+
+  info.appendChild(meta);
+  info.appendChild(diagnosis);
+  if (summary.userRating) {
+    const rating = document.createElement('p');
+    rating.className = 'journal-entry-rating';
+    rating.textContent = RATING_LABELS[summary.userRating] || summary.userRating;
+    info.appendChild(rating);
+  }
+
+  row.appendChild(thumb);
+  row.appendChild(info);
+
+  const expanded = document.createElement('div');
+  expanded.className = 'journal-entry-expanded';
+  expanded.hidden = true;
+
+  row.addEventListener('click', () => toggleJournalEntry(summary.id, wrapper, expanded));
+
+  wrapper.appendChild(row);
+  wrapper.appendChild(expanded);
+  return wrapper;
+}
+
+function renderJournalEntryList() {
+  const entries = appState.journal.entries;
+  journalEntryListEmpty.hidden = entries.length > 0;
+  journalEntryList.replaceChildren();
+  entries.forEach(entry => {
+    journalEntryList.appendChild(buildJournalEntryRow(entry));
+  });
+}
+
+function expandJournalEntryById(id) {
+  const wrapper = journalEntryList.querySelector(`.journal-entry[data-id="${CSS.escape(id)}"]`);
+  if (!wrapper) return;
+  const row = wrapper.querySelector('.journal-entry-row');
+  if (row) row.click();
+  wrapper.scrollIntoView({ block: 'center' });
+}
+
+async function renderJournalView() {
+  renderProgressCard(appState.journal.progressSummary);
+  renderJournalEntryList();
+
+  if (!appState.journal.progressSummary) {
+    try {
+      const response = await fetch(getJournalProgressEndpoint());
+      if (response.ok) {
+        const summary = await response.json();
+        appState.journal.progressSummary = summary && summary.generatedAt ? summary : null;
+        renderProgressCard(appState.journal.progressSummary);
+      }
+    } catch (err) {
+      console.warn('APS: journal progress fetch failed:', err);
+    }
+  }
+}
+
+function findPreviousSessionsForActiveImage() {
+  const activeImage = getActiveImageState();
+  const filename = activeImage.filename || '';
+  const paintingId = journalPaintingTitle.value.trim() || appState.journal.lastPaintingId || '';
+  if (!filename && !paintingId) return [];
+  return appState.journal.entries
+    .filter(e => (filename && e.filename === filename) || (paintingId && e.paintingId === paintingId))
+    .sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
+}
+
+function refreshPrevSessionsBlock() {
+  if (!isInProcessMode() && !isStudioCheckMode()) {
+    prevSessionsBlock.hidden = true;
+    return;
+  }
+
+  const matches = findPreviousSessionsForActiveImage();
+  if (!matches.length) {
+    prevSessionsBlock.hidden = true;
+    return;
+  }
+
+  const dates = matches.slice(0, 3).map(e => formatDateDDMMYYYY(e.savedAt));
+  prevSessionsLabel.textContent = `Previous sessions of this painting: ${dates.join(', ')}`;
+  prevSessionsBlock.hidden = false;
+}
+
+function resetPrevSessionsBlock() {
+  prevSessionsCheckbox.checked = false;
+  appState.journal.usePreviousSession = false;
+  prevSessionsBlock.hidden = true;
+}
+
+prevSessionsCheckbox.addEventListener('change', () => {
+  appState.journal.usePreviousSession = prevSessionsCheckbox.checked;
+});
+
+prevSessionsLabel.addEventListener('click', () => {
+  const matches = findPreviousSessionsForActiveImage();
+  if (!matches.length) return;
+  showJournalView();
+  window.setTimeout(() => expandJournalEntryById(matches[0].id), 0);
+});
+
+function addPreviousEntryId(body) {
+  if (!appState.journal.usePreviousSession) return;
+  const matches = findPreviousSessionsForActiveImage();
+  if (matches.length) body.previousEntryId = matches[0].id;
+}
 
 function refreshSemanticSource() {
   const status = appState.semanticStatus;
@@ -1909,6 +2262,7 @@ function refreshCritiquePanel(reason) {
   refreshCritiqueCopy();
   refreshMockupUi();
   refreshChatSection();
+  refreshPrevSessionsBlock();
   printBtn.hidden = !appState.semantic;
 
   renderCurrentDisplay();
@@ -2004,6 +2358,7 @@ fileInput.addEventListener('change', async () => {
     if (supportsAnnotatedMockup()) resetMockup();
     hideJournalSection();
     resetChatSection();
+    resetPrevSessionsBlock();
 
     showCanvas();
     renderCurrentDisplay();
@@ -2080,6 +2435,7 @@ resetBtn.addEventListener('click', () => {
   if (supportsAnnotatedMockup()) resetMockup();
   hideJournalSection();
   resetChatSection();
+  resetPrevSessionsBlock();
   showEmptyState();
 });
 
@@ -2100,7 +2456,15 @@ function setActiveTab(mode) {
 modeTabs.forEach(tab => {
   tab.addEventListener('click', () => {
     const mode = tab.dataset.mode;
-    if (mode === appState.workflowMode) return;
+    const returningFromJournal = appState.view === 'journal';
+    if (mode === appState.workflowMode) {
+      if (returningFromJournal) {
+        showWorkflowView();
+        setActiveTab(mode);
+      }
+      return;
+    }
+    showWorkflowView();
     appState.workflowMode = mode;
     setActiveTab(mode);
     const modeActions = document.querySelector('.mode-actions');
@@ -2112,6 +2476,7 @@ modeTabs.forEach(tab => {
     resetPendingEdit();
     hideJournalSection();
     resetChatSection();
+    resetPrevSessionsBlock();
     renderCurrentDisplay();
     refreshCanvasToggle();
     if (getActiveImageState().bitmap) {

@@ -19,6 +19,9 @@ const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models
 const PROMPT_VERSION = '2.0';
 const JOURNAL_DIR = path.join(ROOT_DIR, 'studio-journal');
 const JOURNAL_ENTRIES_DIR = path.join(JOURNAL_DIR, 'entries');
+const PROGRESS_SUMMARY_PATH = path.join(JOURNAL_DIR, 'progress-summary.json');
+const DISTILL_ENTRY_LIMIT = 15;
+const DISTILL_AUTO_THRESHOLD = 5;
 
 loadEnv(path.join(SERVER_DIR, '.env'));
 loadEnv(path.join(ROOT_DIR, '.env'));
@@ -329,6 +332,29 @@ const STUDIO_CHECK_PROMPT = [
   'Return JSON only, in the requested field order.'
 ].join(' ');
 
+const DISTILL_PROMPT = [
+  "You are a studio mentor reviewing a painter's recent critique history to find patterns across paintings, not single-painting issues.",
+  'You will be given up to 15 recent critique entries, oldest first, each with a workflow mode and a set of critique fields.',
+  'Weight more recent entries higher when identifying patterns.',
+  'Use painter vocabulary consistent with studio doctrine: value structure, edge economy, chroma hierarchy, overworking, focal hierarchy, atmospheric merging.',
+  'For persistentDevelopmentAreas, name up to 3 recurring weaknesses that show up across multiple paintings, each as one concise sentence naming the specific pattern.',
+  'For improvingAreas, name up to 2 areas where later entries show visible improvement over earlier ones.',
+  'For establishedStrengths, name up to 3 strengths that show up consistently and reliably across paintings.',
+  'Do not invent a pattern from a single entry — only name one if it recurs across at least two entries.',
+  'If there is not enough evidence for a category, return an empty array for it rather than guessing.',
+  'Return JSON only, in the requested field order.'
+].join(' ');
+
+const DISTILL_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    persistentDevelopmentAreas: { type: 'ARRAY', items: { type: 'STRING' } },
+    improvingAreas: { type: 'ARRAY', items: { type: 'STRING' } },
+    establishedStrengths: { type: 'ARRAY', items: { type: 'STRING' } }
+  },
+  required: ['persistentDevelopmentAreas', 'improvingAreas', 'establishedStrengths']
+};
+
 const FOLLOWUP_PROMPT = [
   'You are the same studio mentor who wrote the critique below on this painting.',
   "Answer the painter's follow-up question.",
@@ -370,7 +396,8 @@ const server = http.createServer(async (req, res) => {
     isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process',
       '/api/studio-check', '/api/finished-critique', '/api/image-edit',
       '/api/journal/save', '/api/journal/list', '/api/journal/entry',
-      '/api/journal/update', '/api/followup'].includes(url.pathname);
+      '/api/journal/update', '/api/followup', '/api/journal/distill',
+      '/api/journal/progress'].includes(url.pathname);
 
     if (isApiRequest && req.method === 'OPTIONS') {
       sendApiPreflight(req, res);
@@ -429,6 +456,16 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/followup') {
       await handleFollowup(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/journal/distill') {
+      await handleJournalDistill(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/journal/progress') {
+      await handleJournalProgress(req, res);
       return;
     }
 
@@ -539,13 +576,16 @@ async function handleInProcess(req, res) {
     return;
   }
 
+  const previousEntry = resolvePreviousEntry(body.previousEntryId);
+
   const critique = await callGeminiInProcessPass({
     wipImage,
     wipMimeType,
     referenceImage,
     referenceMimeType,
     mockupImage,
-    mockupMimeType
+    mockupMimeType,
+    previousEntry
   });
   console.log('APS proxy: in-process critique object created');
   sendApiJson(req, res, 200, critique);
@@ -633,6 +673,8 @@ async function handleStudioCheck(req, res) {
     return;
   }
 
+  const previousEntry = resolvePreviousEntry(body.previousEntryId);
+
   const critique = await callGeminiStudioCheckPass({
     finishedImage,
     finishedMimeType,
@@ -641,7 +683,8 @@ async function handleStudioCheck(req, res) {
     wipImage,
     wipMimeType,
     mockupImage,
-    mockupMimeType
+    mockupMimeType,
+    previousEntry
   });
   console.log('APS proxy: studio check critique object created');
   sendApiJson(req, res, 200, critique);
@@ -755,6 +798,7 @@ async function handleJournalSave(req, res) {
 
   console.log(`APS proxy: journal entry saved ${basename}`);
   sendApiJson(req, res, 200, { id });
+  maybeAutoDistill();
 }
 
 async function handleJournalList(req, res) {
@@ -767,15 +811,20 @@ async function handleJournalList(req, res) {
   ensureJournalDir();
 
   const summaries = listJournalEntries()
-    .map(({ entry }) => ({
-      id: entry.id,
-      savedAt: entry.savedAt,
-      workflowMode: entry.workflowMode,
-      filename: entry.filename,
-      paintingId: entry.paintingId,
-      priorityDiagnosis: entry.critique?.priorityDiagnosis || '',
-      userRating: entry.userRating
-    }))
+    .map(({ filePath, entry }) => {
+      const basename = path.basename(filePath, '.json');
+      const thumbPath = path.join(JOURNAL_ENTRIES_DIR, `${basename}.jpg`);
+      return {
+        id: entry.id,
+        savedAt: entry.savedAt,
+        workflowMode: entry.workflowMode,
+        filename: entry.filename,
+        paintingId: entry.paintingId,
+        priorityDiagnosis: entry.critique?.priorityDiagnosis || '',
+        userRating: entry.userRating,
+        thumbnailUrl: fs.existsSync(thumbPath) ? `/studio-journal/entries/${basename}.jpg` : ''
+      };
+    })
     .sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
 
   sendApiJson(req, res, 200, summaries);
@@ -827,6 +876,199 @@ async function handleJournalUpdate(req, res) {
   fs.writeFileSync(filePath, JSON.stringify(entry, null, 2));
   console.log(`APS proxy: journal entry updated ${id}`);
   sendApiJson(req, res, 200, { ok: true, id });
+}
+
+async function handleJournalDistill(req, res) {
+  console.log('APS proxy: journal distill request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    return;
+  }
+
+  ensureJournalDir();
+  const summary = await runDistillation();
+  if (!summary) {
+    sendApiJson(req, res, 400, { error: 'no_journal_entries' });
+    return;
+  }
+
+  console.log(`APS proxy: progress summary regenerated (${summary.entryCount} entries)`);
+  sendApiJson(req, res, 200, summary);
+}
+
+async function handleJournalProgress(req, res) {
+  console.log('APS proxy: journal progress request received');
+  if (req.method !== 'GET') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  sendApiJson(req, res, 200, loadProgressSummary() || {});
+}
+
+function loadProgressSummary() {
+  try {
+    return JSON.parse(fs.readFileSync(PROGRESS_SUMMARY_PATH, 'utf8'));
+  } catch (_err) {
+    return null;
+  }
+}
+
+function resolvePreviousEntry(previousEntryId) {
+  const id = typeof previousEntryId === 'string' ? previousEntryId : '';
+  if (!id) return null;
+  const found = findJournalEntryById(id);
+  return found ? found.entry : null;
+}
+
+function buildHistoryBlock(progressSummary, previousEntry) {
+  const parts = [];
+
+  const persistent = progressSummary?.persistentDevelopmentAreas || [];
+  const improving = progressSummary?.improvingAreas || [];
+  if (persistent.length || improving.length) {
+    parts.push([
+      `Painter history — persistent development areas from past sessions: ${persistent.join(' ') || 'none identified yet'}.`,
+      `Improving: ${improving.join(' ') || 'none identified yet'}.`,
+      'If this painting shows one of the persistent areas again, name the pattern explicitly ("this is the recurring X issue") and make it the priority lesson candidate.',
+      'Do not manufacture a connection if the painting does not show it.'
+    ].join(' '));
+  }
+
+  if (previousEntry) {
+    const c = previousEntry.critique || {};
+    const concluded = [c.priorityDiagnosis, c.repaintHandoff, c.teachingPoint]
+      .map(v => cleanText(v, ''))
+      .filter(Boolean)
+      .join(' ');
+    if (concluded) {
+      parts.push(`Previous session on this painting concluded: ${concluded} Assess whether that guidance was acted on and say so.`);
+    }
+  }
+
+  return parts.join('\n');
+}
+
+function maybeAutoDistill() {
+  if (!process.env.GEMINI_API_KEY) return;
+
+  const cached = loadProgressSummary();
+  const generatedAt = cached?.generatedAt || '';
+  const newCount = listJournalEntries()
+    .filter(({ entry }) => !generatedAt || entry.savedAt > generatedAt)
+    .length;
+
+  if (newCount >= DISTILL_AUTO_THRESHOLD) {
+    runDistillation()
+      .then(summary => {
+        if (summary) console.log(`APS proxy: auto-distilled progress summary (${summary.entryCount} entries)`);
+      })
+      .catch(err => console.warn('APS proxy: auto-distill failed:', err.message));
+  }
+}
+
+async function runDistillation() {
+  const sorted = listJournalEntries()
+    .map(({ entry }) => entry)
+    .sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
+
+  const recent = sorted.slice(0, DISTILL_ENTRY_LIMIT).filter(entry => entry.userRating !== 'off');
+  if (!recent.length) return null;
+
+  const chronological = recent.slice().reverse();
+  const summary = await callGeminiDistill(chronological);
+  fs.writeFileSync(PROGRESS_SUMMARY_PATH, JSON.stringify(summary, null, 2));
+  return summary;
+}
+
+async function callGeminiDistill(entries) {
+  const entriesText = entries
+    .map((entry, index) => summarizeJournalEntryForDistill(entry, index))
+    .join('\n\n');
+
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: DISTILL_PROMPT }, { text: entriesText }] }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          response_schema: DISTILL_SCHEMA,
+          temperature: 0.2,
+          max_output_tokens: 3000
+        }
+      })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || `Gemini returned ${response.status}`;
+    throw new Error(message);
+  }
+
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map(part => part.text || '')
+    .join('')
+    .trim();
+
+  if (!text) {
+    throw new Error('Gemini returned no distillation JSON');
+  }
+
+  console.log(`APS proxy: Gemini distill response received: ${previewText(text)}`);
+  const parsed = parseDistillJson(text);
+
+  return {
+    persistentDevelopmentAreas: normalizeStringArray(parsed.persistentDevelopmentAreas, []).slice(0, 3),
+    improvingAreas: normalizeStringArray(parsed.improvingAreas, []).slice(0, 2),
+    establishedStrengths: normalizeStringArray(parsed.establishedStrengths, []).slice(0, 3),
+    entryCount: entries.length,
+    generatedAt: new Date().toISOString()
+  };
+}
+
+function parseDistillJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (_err) {
+    return JSON.parse(lightCleanupJson(text));
+  }
+}
+
+function summarizeJournalEntryForDistill(entry, index) {
+  const c = entry.critique || {};
+  const fields = [
+    ['Mode', entry.workflowMode],
+    ['Priority diagnosis', c.priorityDiagnosis],
+    ['Teaching point', c.teachingPoint],
+    ['Value structure', c.valueStructureCritique],
+    ['Edges and atmosphere', c.edgeAtmosphereCritique],
+    ['Chroma', c.chromaHierarchyCritique],
+    ['Watercolor handling', c.watercolorHandling],
+    ['Preserve', c.preserve],
+    ['Avoid', c.avoid]
+  ];
+
+  const body = fields
+    .map(([label, value]) => {
+      const cleaned = cleanText(value, '');
+      return cleaned ? `${label}: ${cleaned}` : '';
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  return `Entry ${index + 1} (${(entry.savedAt || '').slice(0, 10)}):\n${body}`;
 }
 
 function ensureJournalDir() {
@@ -1419,8 +1661,9 @@ function buildInProcessPrompt(context) {
     'For demonstrationDescription, describe a small mental overlay or study mark that would clarify the correction without over-rendering.',
     'For teachingPoint, name one transferable principle the painter can carry beyond this image.',
     'For repaintHandoff, give 3 to 5 ordered next painting actions in one compact paragraph.',
-    'For preserve and avoid, be specific about what should stay fresh and what action would damage the WIP further.'
-  ].join('\n');
+    'For preserve and avoid, be specific about what should stay fresh and what action would damage the WIP further.',
+    buildHistoryBlock(loadProgressSummary(), context.previousEntry)
+  ].filter(Boolean).join('\n');
 }
 
 function buildStudioCheckPrompt(context) {
@@ -1448,8 +1691,9 @@ function buildStudioCheckPrompt(context) {
     'For preserve and avoid, identify what must not be touched and what action would damage the near-final painting.',
     'For signingRecommendation, give a direct single verdict: sign now (with brief reason), one adjustment first (name it specifically), or step back (only if something structural is genuinely still wrong).',
     'For finalAdjustments, if adjustments are warranted, list at most three ordered bounded actions. Each names the passage, the action, and the medium if relevant.',
-    'For mediaOptions, if pen, pastel, charcoal, gouache, or acrylic could help where watercolor cannot, name the passage, the action, and what to test first. Return empty string if nothing applies.'
-  ].join('\n');
+    'For mediaOptions, if pen, pastel, charcoal, gouache, or acrylic could help where watercolor cannot, name the passage, the action, and what to test first. Return empty string if nothing applies.',
+    buildHistoryBlock(loadProgressSummary(), context.previousEntry)
+  ].filter(Boolean).join('\n');
 }
 
 function buildFinishedCritiquePrompt(context) {

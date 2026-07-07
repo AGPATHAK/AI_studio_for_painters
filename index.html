@@ -48,6 +48,14 @@
                 <p class="step-hint" id="step-annotate-hint"></p>
               </div>
             </div>
+
+            <div class="prev-sessions-block" id="prev-sessions-block" hidden>
+              <p class="prev-sessions-label" id="prev-sessions-label"></p>
+              <label class="prev-sessions-checkbox-row">
+                <input type="checkbox" id="prev-sessions-checkbox">
+                Give the mentor the last session's conclusions
+              </label>
+            </div>
           </div>
         </div>
 
@@ -64,6 +72,8 @@
         </div>
 
       </div>
+
+      <button class="mode-tab-journal" id="journal-view-btn" type="button" hidden>Journal</button>
 
       <button class="btn-clear" id="reset-btn" disabled>
         clear
@@ -256,6 +266,39 @@
       <button class="btn-print" id="print-btn" hidden>print / save PDF</button>
 
     </aside>
+
+    <!-- Journal view: development-areas summary + entry history (not a workflow mode) -->
+    <section class="journal-view" id="journal-view-panel" hidden aria-label="Studio journal">
+      <div class="journal-view-header">
+        <h2>Studio journal</h2>
+      </div>
+
+      <div class="progress-card">
+        <div class="progress-card-header">
+          <p class="section-label">Development areas</p>
+          <button class="btn-refresh-summary" id="refresh-summary-btn" type="button">Refresh summary</button>
+        </div>
+        <p class="progress-generated-at" id="progress-generated-at"></p>
+        <p class="progress-empty" id="progress-empty" hidden>No summary yet. Save a few critiques, then refresh.</p>
+        <div class="progress-sections" id="progress-sections" hidden>
+          <div class="progress-section">
+            <p class="section-label">Persistent development areas</p>
+            <ul id="progress-persistent-list"></ul>
+          </div>
+          <div class="progress-section">
+            <p class="section-label">Improving</p>
+            <ul id="progress-improving-list"></ul>
+          </div>
+          <div class="progress-section">
+            <p class="section-label">Established strengths</p>
+            <ul id="progress-strengths-list"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="journal-entry-list" id="journal-entry-list"></div>
+      <p class="journal-entry-list-empty" id="journal-entry-list-empty" hidden>No journal entries yet.</p>
+    </section>
 
   </div><!-- /.app-layout -->
 
