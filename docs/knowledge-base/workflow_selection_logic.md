@@ -243,6 +243,32 @@ Choose based on what the painter needs:
 
 ---
 
+## Stage Selection (four-stage workflow)
+
+### In-Process vs Studio Check
+
+Use **In-Process** when:
+- the painting is clearly still in development,
+- significant structural decisions are still open,
+- you expect to repaint one or more passages.
+
+Use **Studio Check** when:
+- the painting feels mostly resolved,
+- you are deciding whether to sign it,
+- the question is "sign now or do one more thing?".
+
+Studio Check outputs a direct signing verdict. It may suggest media additions (pen, pastel, dry brush) that In-Process would not address.
+
+---
+
+### Studio Check vs Archive
+
+Use **Studio Check** before signing — corrections are still possible and edit buttons are active.
+
+Use **Archive** after signing — the painting is closed. Archive generates a study record: strengths to repeat, weakness patterns to practice, future directions. No corrections.
+
+---
+
 ## Selection Questions
 
 Before choosing a workflow, ask:

@@ -31,6 +31,7 @@ const LOCAL_DEV_ALLOWED_ORIGINS = new Set([
 const WORKFLOW_MODES = {
   REFERENCE_IDEATION: 'reference-ideation',
   IN_PROGRESS_GUIDANCE: 'in-progress-guidance',
+  PRE_SIGN: 'pre-sign',
   FINISHED_REVIEW: 'finished-review'
 };
 
@@ -84,6 +85,88 @@ const SEMANTIC_SCHEMA = {
     'preserve',
     'avoid',
     'uncertaintyNote'
+  ]
+};
+
+const STUDIO_CHECK_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    sceneSummary: { type: 'STRING' },
+    priorityDiagnosis: { type: 'STRING' },
+    sceneRead: { type: 'STRING' },
+    valueStructureCritique: { type: 'STRING' },
+    focalHierarchyCritique: { type: 'STRING' },
+    edgeAtmosphereCritique: { type: 'STRING' },
+    chromaHierarchyCritique: { type: 'STRING' },
+    watercolorHandling: { type: 'STRING' },
+    interventionScope: { type: 'STRING' },
+    demonstrationDescription: { type: 'STRING' },
+    teachingPoint: { type: 'STRING' },
+    repaintHandoff: { type: 'STRING' },
+    preserve: { type: 'STRING' },
+    avoid: { type: 'STRING' },
+    uncertaintyNote: { type: 'STRING' },
+    signingRecommendation: { type: 'STRING' },
+    finalAdjustments: { type: 'STRING' },
+    mediaOptions: { type: 'STRING' }
+  },
+  required: [
+    'priorityDiagnosis',
+    'sceneRead',
+    'valueStructureCritique',
+    'focalHierarchyCritique',
+    'edgeAtmosphereCritique',
+    'chromaHierarchyCritique',
+    'watercolorHandling',
+    'interventionScope',
+    'demonstrationDescription',
+    'teachingPoint',
+    'repaintHandoff',
+    'preserve',
+    'avoid',
+    'uncertaintyNote',
+    'signingRecommendation',
+    'finalAdjustments'
+  ]
+};
+
+const ARCHIVE_SCHEMA = {
+  type: 'OBJECT',
+  properties: {
+    sceneSummary: { type: 'STRING' },
+    priorityDiagnosis: { type: 'STRING' },
+    sceneRead: { type: 'STRING' },
+    valueStructureCritique: { type: 'STRING' },
+    focalHierarchyCritique: { type: 'STRING' },
+    edgeAtmosphereCritique: { type: 'STRING' },
+    chromaHierarchyCritique: { type: 'STRING' },
+    watercolorHandling: { type: 'STRING' },
+    interventionScope: { type: 'STRING' },
+    demonstrationDescription: { type: 'STRING' },
+    teachingPoint: { type: 'STRING' },
+    repaintHandoff: { type: 'STRING' },
+    preserve: { type: 'STRING' },
+    avoid: { type: 'STRING' },
+    uncertaintyNote: { type: 'STRING' },
+    strengths: { type: 'STRING' },
+    studyAreas: { type: 'STRING' },
+    nextExploration: { type: 'STRING' },
+    exhibitionNote: { type: 'STRING' }
+  },
+  required: [
+    'priorityDiagnosis',
+    'sceneRead',
+    'valueStructureCritique',
+    'focalHierarchyCritique',
+    'edgeAtmosphereCritique',
+    'chromaHierarchyCritique',
+    'watercolorHandling',
+    'teachingPoint',
+    'preserve',
+    'strengths',
+    'studyAreas',
+    'nextExploration',
+    'exhibitionNote'
   ]
 };
 
@@ -176,22 +259,51 @@ const IN_PROCESS_PROMPT = [
   'Return JSON only, in the requested field order. Each field should be concise but actionable in the studio.'
 ].join(' ');
 
+const STUDIO_CHECK_PROMPT = [
+  'You are a studio mentor reviewing a painting the artist is about to sign.',
+  'This is Studio Check Mode. The first image is the near-final painting.',
+  'A reference, annotated mockup, or WIP may follow as optional context only; the near-final painting is the main work.',
+  'The central question is: sign now, or make one more bounded adjustment first?',
+  'Diagnose the current state across the standard dimensions — value structure, focal hierarchy, edges, chroma, and watercolor handling —',
+  'but frame every observation as a last opportunity, not an ongoing process.',
+  'AI tightness bias: do not push toward more explicit edges, more separated forms, or digital tightness.',
+  'Anti-spiral guard: if no adjustment is worth the risk of overworking the painting, say so directly.',
+  'The painting should stop is a complete and valid answer.',
+  'For signingRecommendation, give a direct verdict — sign now (with brief reason),',
+  'one adjustment first (name the passage and the action), or step back (only if something structural is genuinely still wrong).',
+  'No hedging; one clear direction.',
+  'For finalAdjustments, if adjustments are warranted, list at most three, ordered by impact.',
+  'Each names the passage, the action, and the medium if relevant:',
+  'pen line to anchor an edge, dry pastel for atmosphere, dry brush for texture, gouache or acrylic lift for a critical light.',
+  'For mediaOptions, if a medium other than watercolor (pen, pastel, charcoal, gouache, acrylic) could achieve what',
+  'watercolor alone cannot at this stage, name it specifically — which passage, what it would do, what to test first.',
+  'If nothing applies, return an empty string.',
+  'Close with one transferable teaching point from this painting session.',
+  'Be direct. Avoid excessive positivity, generic encouragement, and AI-art phrasing.',
+  'Return JSON only, in the requested field order.'
+].join(' ');
+
 const FINISHED_CRITIQUE_PROMPT = [
-  'You are an experienced watercolor painter and juror reviewing a finished painting.',
-  'This is Finished Painting Critique Mode. The first image is the completed painting and is sufficient by itself.',
-  'A reference, annotated mockup, or WIP may follow as optional context only; judge the finished painting as the main work.',
-  'Do not give a beginner tutorial. Give serious studio or exhibition-level feedback about whether the piece feels resolved.',
-  'Name the one issue that most determines whether this painting succeeds or fails.',
-  'Value structure: judge value organization, shadow mass architecture, and readability at distance.',
-  'Focal hierarchy: does the eye know where to go? What competes with it? Are edges and contrast hierarchically allocated?',
-  'Edge economy: assess edge variety, brush economy, and whether hard edges are spent wisely near the focal area.',
-  'Chroma hierarchy: is saturation controlled, compositionally justified, and supporting depth?',
-  'Watercolor handling: assess freshness, transparency, wash unity, and paper integrity. Name overworked passages directly.',
-  'AI tightness bias: resist calling for more rendering, sharper definition, or finishing that would make the painting less painterly.',
-  'Give explicit stop/continue guidance. If further changes risk overworking the painting, say so clearly.',
-  'Close with one transferable teaching point.',
+  'You are writing a post-session studio note for a signed, completed painting.',
+  'This is Archive Mode. The first image is the finished, signed painting.',
+  'A reference, annotated mockup, or WIP may follow as optional context only.',
+  'No corrections are possible — the painting is closed.',
+  'Your task is documentation and learning, not prescription.',
+  'Give a full retrospective critique across the standard dimensions — value structure, focal hierarchy, edges, chroma, and watercolor handling —',
+  'framed as studio hindsight, not as actionable guidance.',
+  'AI tightness bias: resist framing strengths as tightness or clarity; value freshness, restraint, and atmospheric merging.',
+  'For strengths, name 2 to 4 specific passages, decisions, or qualities that succeeded.',
+  'Be concrete and memorable enough that the painter can repeat them in future work.',
+  'For studyAreas, name the recurring weakness patterns visible in this painting.',
+  'Frame these as practice directions, not failures — what to work on in studies and future paintings.',
+  'For nextExploration, name 1 or 2 compositional, tonal, or technical ideas that this painting suggests for future work.',
+  'Do not prescribe; gesture toward possibilities.',
+  'For exhibitionNote, give one candid sentence on exhibition readiness —',
+  'not a grade, but an honest read of where this painting stands and what would change that.',
+  'For repaintHandoff, give a final retrospective verdict: did this painting succeed on its own terms, and why?',
+  'No stop/continue guidance — it is signed.',
   'Be candid and specific. Avoid excessive positivity, decorative adjectives, AI-art phrasing, and generic encouragement.',
-  'Return JSON only, in the requested field order. Each field should sound like a concise exhibition or studio critique.'
+  'Return JSON only, in the requested field order.'
 ].join(' ');
 
 const server = http.createServer(async (req, res) => {
@@ -200,7 +312,7 @@ const server = http.createServer(async (req, res) => {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process',
-      '/api/finished-critique', '/api/image-edit'].includes(url.pathname);
+      '/api/studio-check', '/api/finished-critique', '/api/image-edit'].includes(url.pathname);
 
     if (isApiRequest && req.method === 'OPTIONS') {
       sendApiPreflight(req, res);
@@ -219,6 +331,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/in-process') {
       await handleInProcess(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/studio-check') {
+      await handleStudioCheck(req, res);
       return;
     }
 
@@ -396,6 +513,54 @@ async function handleFinishedCritique(req, res) {
     mockupMimeType
   });
   console.log('APS proxy: finished critique object created');
+  sendApiJson(req, res, 200, critique);
+}
+
+async function handleStudioCheck(req, res) {
+  console.log('APS proxy: studio check request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const finishedImage = typeof body.finishedImage === 'string' ? body.finishedImage.trim() : '';
+  const finishedMimeType = typeof body.finishedMimeType === 'string' ? body.finishedMimeType : '';
+  const referenceImage = typeof body.referenceImage === 'string' ? body.referenceImage.trim() : '';
+  const referenceMimeType = typeof body.referenceMimeType === 'string' ? body.referenceMimeType : '';
+  const wipImage = typeof body.wipImage === 'string' ? body.wipImage.trim() : '';
+  const wipMimeType = typeof body.wipMimeType === 'string' ? body.wipMimeType : '';
+  const mockupImage = typeof body.mockupImage === 'string' ? body.mockupImage.trim() : '';
+  const mockupMimeType = typeof body.mockupMimeType === 'string' ? body.mockupMimeType : '';
+
+  if (!finishedImage || !isSupportedImageMimeType(finishedMimeType)) {
+    sendApiJson(req, res, 400, { error: 'invalid_finished_image' });
+    return;
+  }
+
+  if ((referenceImage && !isSupportedImageMimeType(referenceMimeType)) ||
+      (wipImage && !isSupportedImageMimeType(wipMimeType)) ||
+      (mockupImage && !isSupportedImageMimeType(mockupMimeType))) {
+    sendApiJson(req, res, 400, { error: 'invalid_context_image' });
+    return;
+  }
+
+  const critique = await callGeminiStudioCheckPass({
+    finishedImage,
+    finishedMimeType,
+    referenceImage,
+    referenceMimeType,
+    wipImage,
+    wipMimeType,
+    mockupImage,
+    mockupMimeType
+  });
+  console.log('APS proxy: studio check critique object created');
   sendApiJson(req, res, 200, critique);
 }
 
@@ -680,7 +845,7 @@ async function callGeminiFinishedPass(context) {
         contents: [{ parts }],
         generationConfig: {
           response_mime_type: 'application/json',
-          response_schema: SEMANTIC_SCHEMA,
+          response_schema: ARCHIVE_SCHEMA,
           temperature: 0.25,
           max_output_tokens: 3200
         }
@@ -700,12 +865,100 @@ async function callGeminiFinishedPass(context) {
     .trim();
 
   if (!text) {
-    throw new Error('Gemini returned no finished critique JSON');
+    throw new Error('Gemini returned no archive critique JSON');
   }
 
   console.log(`APS proxy: Gemini finished response received: ${previewText(text)}`);
   const parsed = parseSemanticJson(text);
   return normalizeSemanticResponse(parsed, WORKFLOW_MODES.FINISHED_REVIEW);
+}
+
+async function callGeminiStudioCheckPass(context) {
+  const parts = [
+    { text: buildStudioCheckPrompt(context) },
+    { text: 'Near-final painting image:' },
+    {
+      inline_data: {
+        mime_type: context.finishedMimeType,
+        data: context.finishedImage
+      }
+    }
+  ];
+
+  if (context.referenceImage) {
+    parts.push(
+      { text: 'Optional reference context image:' },
+      {
+        inline_data: {
+          mime_type: context.referenceMimeType,
+          data: context.referenceImage
+        }
+      }
+    );
+  }
+
+  if (context.wipImage) {
+    parts.push(
+      { text: 'Optional WIP context image:' },
+      {
+        inline_data: {
+          mime_type: context.wipMimeType,
+          data: context.wipImage
+        }
+      }
+    );
+  }
+
+  if (context.mockupImage) {
+    parts.push(
+      { text: 'Optional annotated mockup context image:' },
+      {
+        inline_data: {
+          mime_type: context.mockupMimeType,
+          data: context.mockupImage
+        }
+      }
+    );
+  }
+
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          response_mime_type: 'application/json',
+          response_schema: STUDIO_CHECK_SCHEMA,
+          temperature: 0.2,
+          max_output_tokens: 3200
+        }
+      })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || `Gemini returned ${response.status}`;
+    throw new Error(message);
+  }
+
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map(part => part.text || '')
+    .join('')
+    .trim();
+
+  if (!text) {
+    throw new Error('Gemini returned no studio check JSON');
+  }
+
+  console.log(`APS proxy: Gemini studio check response received: ${previewText(text)}`);
+  const parsed = parseSemanticJson(text);
+  return normalizeSemanticResponse(parsed, WORKFLOW_MODES.PRE_SIGN);
 }
 
 async function callGeminiMockupPass(imageBase64, mimeType, ideation) {
@@ -806,6 +1059,35 @@ function buildInProcessPrompt(context) {
   ].join('\n');
 }
 
+function buildStudioCheckPrompt(context) {
+  const contextLine = [
+    context.referenceImage ? 'reference photo available' : 'no reference photo supplied',
+    context.wipImage ? 'WIP image available' : 'no WIP image supplied',
+    context.mockupImage ? 'annotated mockup available' : 'no annotated mockup supplied'
+  ].join('; ');
+
+  return [
+    STUDIO_CHECK_PROMPT,
+    '',
+    `Context: ${contextLine}.`,
+    'For priorityDiagnosis, name the single most important observation about the near-final painting — what determines signing readiness.',
+    'For sceneRead, describe the first read of the painting — what the eye does, where it lands, what it feels.',
+    'For valueStructureCritique, assess value organization as a last-pass check: is there anything still unresolved that matters?',
+    'For focalHierarchyCritique, check whether focal contrast, edge emphasis, and chroma are clearly allocated. Is the focal claim settled?',
+    'For edgeAtmosphereCritique, check for over-equal edges or atmospheric passages that could be improved with one careful action.',
+    'For chromaHierarchyCritique, check whether saturation is controlled or still competing in any passage.',
+    'For watercolorHandling, assess whether the painting still feels fresh. Name any passage at risk of being overworked.',
+    'For interventionScope, name the scope class of the recommended adjustment (local, regional, or sign now) and the protected passages.',
+    'For demonstrationDescription, describe a small last test that would clarify whether a change is worth attempting.',
+    'For teachingPoint, name one transferable lesson from this painting session.',
+    'For repaintHandoff, give compact final-step guidance or confirm the painting should stop here.',
+    'For preserve and avoid, identify what must not be touched and what action would damage the near-final painting.',
+    'For signingRecommendation, give a direct single verdict: sign now (with brief reason), one adjustment first (name it specifically), or step back (only if something structural is genuinely still wrong).',
+    'For finalAdjustments, if adjustments are warranted, list at most three ordered bounded actions. Each names the passage, the action, and the medium if relevant.',
+    'For mediaOptions, if pen, pastel, charcoal, gouache, or acrylic could help where watercolor cannot, name the passage, the action, and what to test first. Return empty string if nothing applies.'
+  ].join('\n');
+}
+
 function buildFinishedCritiquePrompt(context) {
   const contextLine = [
     context.referenceImage ? 'reference photo available' : 'no reference photo supplied',
@@ -817,18 +1099,21 @@ function buildFinishedCritiquePrompt(context) {
     FINISHED_CRITIQUE_PROMPT,
     '',
     `Context: ${contextLine}.`,
-    'For priorityDiagnosis, state the single strongest critique: what determines whether this painting succeeds or fails.',
-    'For sceneRead, describe the first read of the finished painting — what the eye does, where it lands, what it feels.',
-    'For valueStructureCritique, judge value organization, shadow mass architecture, and readability at distance.',
-    'For focalHierarchyCritique, say whether focal contrast, edge emphasis, and chroma are hierarchically allocated to one dominant area.',
-    'For edgeAtmosphereCritique, judge edge variety, atmospheric freshness, and whether hard edges are spent wisely.',
-    'For chromaHierarchyCritique, judge whether saturation is compositionally justified and supporting depth.',
-    'For watercolorHandling, assess freshness, transparency, wash unity, paper integrity, and name any overworked passages directly.',
-    'For interventionScope, say whether any final adjustment is narrow enough to attempt, or whether the painting should stop.',
-    'For demonstrationDescription, describe a mental comparison or small test that would clarify whether a change is worth risking.',
+    'For priorityDiagnosis, name the single most important retrospective observation: what most determined whether this painting succeeded or fell short.',
+    'For sceneRead, describe the first read of the signed painting — what the eye does, where it lands, what it communicates.',
+    'For valueStructureCritique, judge value organization, shadow mass architecture, and readability at distance as hindsight.',
+    'For focalHierarchyCritique, assess whether focal contrast, edge emphasis, and chroma were hierarchically allocated.',
+    'For edgeAtmosphereCritique, judge edge variety, atmospheric freshness, and whether hard edges were spent wisely.',
+    'For chromaHierarchyCritique, judge whether saturation was compositionally justified and supporting depth.',
+    'For watercolorHandling, assess freshness, transparency, wash unity, and paper integrity as a final read.',
+    'For interventionScope and demonstrationDescription, use these fields to describe the painting\'s overall resolution level and what a future version would address.',
     'For teachingPoint, name one transferable lesson from this painting.',
-    'For repaintHandoff, give explicit stop/continue guidance and any final limited actions.',
-    'For preserve and avoid, identify what must remain untouched and what action would weaken or overwork the finished painting.'
+    'For repaintHandoff, give a final retrospective verdict: did this painting succeed on its own terms and why? No stop/continue guidance.',
+    'For preserve and avoid, name what succeeded most and what recurring action weakened this painting.',
+    'For strengths, name 2 to 4 specific passages, decisions, or qualities that succeeded — concrete enough to repeat.',
+    'For studyAreas, name the recurring weakness patterns as practice directions for future studies and paintings.',
+    'For nextExploration, gesture toward 1 or 2 compositional, tonal, or technical ideas this painting suggests for future work.',
+    'For exhibitionNote, give one candid sentence on exhibition readiness — where this painting stands and what would change that.'
   ].join('\n');
 }
 
@@ -898,7 +1183,14 @@ function normalizeSemanticResponse(raw, workflowMode = WORKFLOW_MODES.IN_PROGRES
     moodPossibilities: cleanText(safe.moodPossibilities, ''),
     suppress: cleanText(safe.suppress, ''),
     emphasize: cleanText(safe.emphasize, ''),
-    abstractionOpportunities: cleanText(safe.abstractionOpportunities, '')
+    abstractionOpportunities: cleanText(safe.abstractionOpportunities, ''),
+    signingRecommendation: cleanText(safe.signingRecommendation, ''),
+    finalAdjustments: cleanText(safe.finalAdjustments, ''),
+    mediaOptions: cleanText(safe.mediaOptions, ''),
+    strengths: cleanText(safe.strengths, ''),
+    studyAreas: cleanText(safe.studyAreas, ''),
+    nextExploration: cleanText(safe.nextExploration, ''),
+    exhibitionNote: cleanText(safe.exhibitionNote, '')
   };
 }
 

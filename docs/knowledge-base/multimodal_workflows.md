@@ -327,6 +327,50 @@ When a workflow needs a repeatable instruction unit, use [prompt_primitives.md](
 
 ---
 
+## Four-Stage Workflow (current implementation)
+
+The app uses four stages, each with its own prompt, schema, and intended use.
+
+### Stage 1: Reference Ideation
+
+**When:** Before painting starts. Upload a reference photograph.
+**Purpose:** Compositional and painterly interpretation — what could this become as a painting?
+**Prompt framing:** Design operations, shape economy, value massing, crop ideas, atmospheric simplification.
+**Output:** Dominant read, value masses, atmosphere, focal hierarchy, simplification idea, palette direction, crop ideas.
+**No corrections.** This is not a critique.
+
+---
+
+### Stage 2: In-Process
+
+**When:** Painting is under way. Upload a WIP photo.
+**Purpose:** Identify the single most structurally important issue; prescribe one bounded next action.
+**Prompt framing:** Progressive reveal — one priority lesson, scope class, protected passages, repaint guidance.
+**Output:** priorityDiagnosis, sceneRead, value/focal/edge/chroma/watercolor critique, interventionScope, teachingPoint, repaintHandoff, preserve, avoid.
+**Edit buttons active** (value, focal, edges, chroma → suggest edit → apply correction).
+
+---
+
+### Stage 3: Studio Check
+
+**When:** Painting feels nearly done but has not been signed. Upload the near-final painting.
+**Purpose:** Answer one question: sign now, or make one more bounded adjustment first?
+**Prompt framing:** Last-opportunity read across all dimensions. Anti-spiral guard — "the painting should stop" is a complete answer.
+**New fields:** signingRecommendation (direct verdict), finalAdjustments (≤3 ordered actions), mediaOptions (pen, pastel, dry brush, gouache if applicable).
+**Edit buttons active** (same 4 as In-Process). Corrections are still possible here.
+
+---
+
+### Stage 4: Archive
+
+**When:** Painting is signed and complete. Upload the finished, signed work.
+**Purpose:** Retrospective critique and study record — not prescription, not correction.
+**Prompt framing:** Post-session studio note. Document what worked, what to study, where to go next.
+**New fields:** strengths (2–4 specific successes to repeat), studyAreas (recurring weakness patterns to practice), nextExploration (1–2 future ideas), exhibitionNote (one-sentence candid readiness assessment).
+**No edit buttons.** The painting is closed.
+
+---
+
 ## Future Workflow Direction
 
 The long-term direction emphasizes:
