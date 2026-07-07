@@ -329,6 +329,16 @@ const STUDIO_CHECK_PROMPT = [
   'Return JSON only, in the requested field order.'
 ].join(' ');
 
+const FOLLOWUP_PROMPT = [
+  'You are the same studio mentor who wrote the critique below on this painting.',
+  "Answer the painter's follow-up question.",
+  'Rules: stay scoped to this painting and this critique; painter-to-painter register, intermediate level, no basic technique explanations;',
+  'be direct and concise (under 150 words unless the question demands a procedure);',
+  "you may disagree with your own critique if the painter's point is right — say so plainly;",
+  'do not redesign the painting or expand scope beyond the critique\'s intervention scope;',
+  'if the question needs information you cannot see, say so.'
+].join(' ');
+
 const FINISHED_CRITIQUE_PROMPT = [
   'You are writing a post-session studio note for a signed, completed painting.',
   'This is Archive Mode. The first image is the finished, signed painting.',
@@ -360,7 +370,7 @@ const server = http.createServer(async (req, res) => {
     isApiRequest = ['/api/semantic', '/api/mockup', '/api/in-process',
       '/api/studio-check', '/api/finished-critique', '/api/image-edit',
       '/api/journal/save', '/api/journal/list', '/api/journal/entry',
-      '/api/journal/update'].includes(url.pathname);
+      '/api/journal/update', '/api/followup'].includes(url.pathname);
 
     if (isApiRequest && req.method === 'OPTIONS') {
       sendApiPreflight(req, res);
@@ -414,6 +424,11 @@ const server = http.createServer(async (req, res) => {
 
     if (url.pathname === '/api/journal/update') {
       await handleJournalUpdate(req, res);
+      return;
+    }
+
+    if (url.pathname === '/api/followup') {
+      await handleFollowup(req, res);
       return;
     }
 
@@ -662,6 +677,41 @@ async function handleImageEdit(req, res) {
   const result = await callGeminiImageEdit(image, mimeType, prompt);
   console.log('APS proxy: image edit completed');
   sendApiJson(req, res, 200, result);
+}
+
+async function handleFollowup(req, res) {
+  console.log('APS proxy: followup request received');
+  if (req.method !== 'POST') {
+    sendApiJson(req, res, 405, { error: 'method_not_allowed' });
+    return;
+  }
+
+  if (!process.env.GEMINI_API_KEY) {
+    sendApiJson(req, res, 503, { error: 'missing_gemini_api_key' });
+    return;
+  }
+
+  const body = await readJsonBody(req);
+  const image = typeof body.image === 'string' ? body.image.trim() : '';
+  const mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
+  const workflowMode = normalizeWorkflowMode(body.workflowMode);
+  const critique = body.critique && typeof body.critique === 'object' ? body.critique : {};
+  const history = Array.isArray(body.history) ? body.history : [];
+  const question = typeof body.question === 'string' ? body.question.trim() : '';
+
+  if (!image || !isSupportedImageMimeType(mimeType)) {
+    sendApiJson(req, res, 400, { error: 'invalid_image' });
+    return;
+  }
+
+  if (!question) {
+    sendApiJson(req, res, 400, { error: 'missing_question' });
+    return;
+  }
+
+  const answer = await callGeminiFollowup({ image, mimeType, workflowMode, critique, history, question });
+  console.log('APS proxy: followup answer generated');
+  sendApiJson(req, res, 200, answer);
 }
 
 async function handleJournalSave(req, res) {
@@ -1245,6 +1295,97 @@ async function callGeminiMockupPass(imageBase64, mimeType, ideation) {
     imageDataUrl: `data:${outputMimeType};base64,${data}`,
     notes
   };
+}
+
+async function callGeminiFollowup({ image, mimeType, workflowMode, critique, history, question }) {
+  const promptText = [
+    withProfile(FOLLOWUP_PROMPT, { doctrine: true, guardrail: true }),
+    '',
+    `Workflow mode: ${workflowMode}.`,
+    'Critique already given on this painting:',
+    summarizeCritiqueForFollowup(critique)
+  ].join('\n');
+
+  const parts = [
+    { text: promptText },
+    { text: 'Painting image:' },
+    { inline_data: { mime_type: mimeType, data: image } }
+  ];
+
+  const boundedHistory = history.slice(-10);
+  for (const turn of boundedHistory) {
+    const speaker = turn && turn.role === 'mentor' ? 'Mentor' : 'Painter';
+    const text = cleanText(turn && turn.text, '');
+    if (text) parts.push({ text: `${speaker}: ${text}` });
+  }
+
+  parts.push({ text: `Painter question: ${question}` });
+
+  const response = await fetch(
+    `${GEMINI_ENDPOINT}/${encodeURIComponent(GEMINI_MODEL)}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        contents: [{ parts }],
+        generationConfig: {
+          temperature: 0.3,
+          max_output_tokens: 2048
+        }
+      })
+    }
+  );
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload.error?.message || `Gemini returned ${response.status}`;
+    throw new Error(message);
+  }
+
+  const finishReason = payload.candidates?.[0]?.finishReason || '';
+  const text = payload.candidates?.[0]?.content?.parts
+    ?.map(part => part.text || '')
+    .join('')
+    .trim();
+
+  if (!text) {
+    throw new Error('Gemini returned no follow-up answer');
+  }
+
+  if (finishReason && finishReason !== 'STOP') {
+    console.warn(`APS proxy: followup response finishReason=${finishReason} (possibly truncated)`);
+  }
+
+  console.log(`APS proxy: Gemini followup response received: ${previewText(text)}`);
+  return { source: 'gemini', model: GEMINI_MODEL, answer: text };
+}
+
+function summarizeCritiqueForFollowup(critique) {
+  const fields = [
+    ['Priority diagnosis', critique.priorityDiagnosis],
+    ['Scene read', critique.sceneRead],
+    ['Value structure', critique.valueStructureCritique],
+    ['Focal hierarchy', critique.focalHierarchyCritique],
+    ['Edges and atmosphere', critique.edgeAtmosphereCritique],
+    ['Chroma', critique.chromaHierarchyCritique],
+    ['Watercolor handling', critique.watercolorHandling],
+    ['Teaching point', critique.teachingPoint],
+    ['Repaint handoff / verdict', critique.repaintHandoff],
+    ['Signing recommendation', critique.signingRecommendation],
+    ['Preserve', critique.preserve],
+    ['Avoid', critique.avoid]
+  ];
+
+  return fields
+    .map(([label, value]) => {
+      const cleaned = cleanText(value, '');
+      return cleaned ? `${label}: ${cleaned}` : '';
+    })
+    .filter(Boolean)
+    .join('\n');
 }
 
 function buildAnnotatedMockupPrompt(ideation) {

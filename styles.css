@@ -707,6 +707,99 @@ body.transitions-ready {
   padding-top: 0;
 }
 
+/* ── Mentor follow-up chat ────────────────────────────────────────────────── */
+.chat-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 13px;
+}
+
+.chat-section[hidden] {
+  display: none;
+}
+
+.chat-transcript {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+
+.chat-transcript:empty {
+  display: none;
+}
+
+.chat-turn {
+  font-size: 0.84rem;
+  line-height: 1.45;
+  padding: 6px 9px;
+  border-radius: 8px;
+  max-width: 92%;
+}
+
+.chat-turn-painter {
+  align-self: flex-end;
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  color: var(--color-text);
+}
+
+.chat-turn-mentor {
+  align-self: flex-start;
+  background: color-mix(in srgb, var(--color-surface) 65%, transparent);
+  color: var(--color-text);
+}
+
+.chat-status {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  margin-top: 6px;
+}
+
+.chat-status[hidden] {
+  display: none;
+}
+
+.chat-input-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-input-row input {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+}
+
+.chat-input-row button {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 650;
+  color: var(--color-accent);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.chat-input-row button:hover {
+  border-color: var(--color-accent);
+}
+
+.chat-input-row button:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
 /* Workflow tint on the critique panel header */
 .critique-panel[data-workflow="reference-ideation"] .panel-title::after {
   content: " · ideation";

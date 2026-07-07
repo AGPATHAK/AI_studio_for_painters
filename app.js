@@ -75,6 +75,10 @@ const appState = {
     entries: [],        // cached /api/journal/list summaries, newest first
     currentEntryId: null,
     lastPaintingId: ''  // most recent title typed this session, across any filename
+  },
+  chat: {
+    turns: [],   // { role: 'painter' | 'mentor', text }
+    sending: false
   }
 };
 
@@ -158,6 +162,11 @@ const journalRatingRow = document.getElementById('journal-rating-row');
 const journalRatingBtns = document.querySelectorAll('.journal-rating-btn');
 const journalNoteRow = document.getElementById('journal-note-row');
 const journalNote = document.getElementById('journal-note');
+const chatSection = document.getElementById('chat-section');
+const chatTranscript = document.getElementById('chat-transcript');
+const chatStatus = document.getElementById('chat-status');
+const chatInput = document.getElementById('chat-input');
+const chatSendBtn = document.getElementById('chat-send-btn');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
@@ -188,7 +197,8 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !aiNextExplItem || !aiNextExploration ||
     !aiExhibitionItem || !aiExhibitionNote ||
     !journalSection || !journalStatus || !journalTitleRow || !journalPaintingTitle ||
-    !journalRatingRow || !journalRatingBtns.length || !journalNoteRow || !journalNote) {
+    !journalRatingRow || !journalRatingBtns.length || !journalNoteRow || !journalNote ||
+    !chatSection || !chatTranscript || !chatStatus || !chatInput || !chatSendBtn) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -209,7 +219,8 @@ const APP_CONFIG = {
   sameOriginJournalSavePath: '/api/journal/save',
   sameOriginJournalListPath: '/api/journal/list',
   sameOriginJournalEntryPath: '/api/journal/entry',
-  sameOriginJournalUpdatePath: '/api/journal/update'
+  sameOriginJournalUpdatePath: '/api/journal/update',
+  sameOriginFollowupPath: '/api/followup'
 };
 
 const WORKFLOW_MODES = {
@@ -360,6 +371,10 @@ function getJournalListEndpoint() {
 
 function getJournalUpdateEndpoint() {
   return getApiEndpoint(APP_CONFIG.sameOriginJournalUpdatePath);
+}
+
+function getFollowupEndpoint() {
+  return getApiEndpoint(APP_CONFIG.sameOriginFollowupPath);
 }
 
 function getApiEndpoint(path) {
@@ -955,6 +970,99 @@ journalNote.addEventListener('blur', () => {
 
 journalPaintingTitle.addEventListener('blur', () => {
   updateJournalEntry({ paintingId: journalPaintingTitle.value.trim() || null });
+});
+
+/* ── Mentor follow-up chat ────────────────────────────────────────────────── */
+
+function hasAnyCritique() {
+  if (!appState.semantic) return false;
+  if (isReferenceIdeationMode()) return hasReferenceIdeation(appState.semantic);
+  if (isInProcessMode()) return hasInProcessCritique();
+  if (isStudioCheckMode()) return hasStudioCheckCritique();
+  if (isFinishedMode()) return hasFinishedCritique();
+  return false;
+}
+
+function refreshChatSection() {
+  chatSection.hidden = !(hasAnyCritique() && appState.semanticStatus.source === 'gemini');
+}
+
+function resetChatSection() {
+  appState.chat.turns = [];
+  appState.chat.sending = false;
+  chatTranscript.replaceChildren();
+  chatInput.value = '';
+  chatStatus.hidden = true;
+  chatSendBtn.disabled = false;
+  chatSection.hidden = true;
+}
+
+function appendChatTurn(role, text) {
+  const p = document.createElement('p');
+  p.className = role === 'mentor' ? 'chat-turn chat-turn-mentor' : 'chat-turn chat-turn-painter';
+  p.textContent = text;
+  chatTranscript.appendChild(p);
+  chatTranscript.scrollTop = chatTranscript.scrollHeight;
+}
+
+async function sendChatMessage() {
+  const question = chatInput.value.trim();
+  if (!question || appState.chat.sending || !appState.semantic) return;
+
+  const activeImage = getActiveImageState();
+  if (!activeImage.file) return;
+
+  appState.chat.sending = true;
+  chatSendBtn.disabled = true;
+  chatStatus.hidden = true;
+  chatInput.value = '';
+  appendChatTurn('painter', question);
+  const historyBeforeQuestion = appState.chat.turns.slice();
+  appState.chat.turns.push({ role: 'painter', text: question });
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+
+  try {
+    const imageData = await fileToBase64(activeImage.file);
+    const response = await fetch(getFollowupEndpoint(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        image: imageData,
+        mimeType: activeImage.file.type,
+        workflowMode: getWorkflowMode(),
+        critique: appState.semantic,
+        history: historyBeforeQuestion,
+        question
+      }),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(`followup endpoint returned ${response.status}`);
+    const payload = await response.json();
+    const answer = cleanUiText(payload.answer) || 'The mentor had no answer for that.';
+    appendChatTurn('mentor', answer);
+    appState.chat.turns.push({ role: 'mentor', text: answer });
+    updateJournalEntry({ chat: appState.chat.turns });
+  } catch (err) {
+    console.warn('APS: follow-up question failed:', err);
+    chatStatus.textContent = err.name === 'AbortError'
+      ? 'The mentor timed out. Try again.'
+      : 'Could not reach the mentor. Try again.';
+    chatStatus.hidden = false;
+  } finally {
+    window.clearTimeout(timeoutId);
+    appState.chat.sending = false;
+    chatSendBtn.disabled = false;
+  }
+}
+
+chatSendBtn.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendChatMessage();
+  }
 });
 
 function refreshSemanticSource() {
@@ -1800,6 +1908,7 @@ function refreshCritiquePanel(reason) {
   refreshSemanticSource();
   refreshCritiqueCopy();
   refreshMockupUi();
+  refreshChatSection();
   printBtn.hidden = !appState.semantic;
 
   renderCurrentDisplay();
@@ -1832,6 +1941,7 @@ async function rerunWorkflowAnalysis() {
   };
   if (isReferenceIdeationMode()) resetMockup();
   hideJournalSection();
+  resetChatSection();
   refreshCritiquePanel('loading');
 
   const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
@@ -1893,6 +2003,7 @@ fileInput.addEventListener('change', async () => {
     resetPendingEdit();
     if (supportsAnnotatedMockup()) resetMockup();
     hideJournalSection();
+    resetChatSection();
 
     showCanvas();
     renderCurrentDisplay();
@@ -1968,6 +2079,7 @@ resetBtn.addEventListener('click', () => {
   resetPendingEdit();
   if (supportsAnnotatedMockup()) resetMockup();
   hideJournalSection();
+  resetChatSection();
   showEmptyState();
 });
 
@@ -1999,6 +2111,7 @@ modeTabs.forEach(tab => {
     appState.semanticStatus = { source: 'none', state: 'unavailable' };
     resetPendingEdit();
     hideJournalSection();
+    resetChatSection();
     renderCurrentDisplay();
     refreshCanvasToggle();
     if (getActiveImageState().bitmap) {
