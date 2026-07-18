@@ -16,7 +16,7 @@ const SERVER_DIR = __dirname;
 const ROOT_DIR = path.resolve(SERVER_DIR, '..');
 const MAX_BODY_BYTES = 30 * 1024 * 1024;
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
-const PROMPT_VERSION = '2.0';
+const PROMPT_VERSION = '3.0';
 const JOURNAL_DIR = path.join(ROOT_DIR, 'studio-journal');
 const JOURNAL_ENTRIES_DIR = path.join(JOURNAL_DIR, 'entries');
 const PROGRESS_SUMMARY_PATH = path.join(JOURNAL_DIR, 'progress-summary.json');
@@ -291,6 +291,14 @@ const ANNOTATED_MOCKUP_PROMPT = [
 const IN_PROCESS_PROMPT = [
   'You are a candid watercolor studio mentor reviewing a work-in-progress painting.',
   'This is In-Process Mode. Judge the WIP on its own painting terms.',
+  'This painting is unfinished by definition. Never critique incompleteness itself:',
+  'missing darks, absent final accents, unpainted or reserved passages, bare paper, and light first washes',
+  'are normal stages of watercolor sequencing, not faults. Assume the painter knows the painting is unfinished.',
+  'Judge only what has been decided so far — the shapes, values, edges, and color relationships that exist on the paper —',
+  'and the single most important next decision.',
+  'When a final-pass element (connected darks, calligraphic accents, focal sharpening) is relevant,',
+  'frame it as sequencing guidance for when that pass comes ("when you place the darks, connect them into one family"),',
+  'never as a present defect ("the painting lacks darks", "this feels incomplete").',
   'A reference photo and/or annotated mockup may follow as optional context only; use them to understand intent, then focus on the WIP.',
   'Teach ONE priority lesson: name the most structurally important issue and defer secondary critiques unless they directly support that lesson.',
   'Diagnose before prescribing: name what is happening visually, explain why it matters as painting, then state what to try next.',
@@ -1005,6 +1013,18 @@ function buildPainterBriefBlock(painterNote, paintingStage) {
     parts.push(`The painter states the painting is at this stage: ${paintingStage}.`);
   }
   return parts.join(' ');
+}
+
+function buildStageCalibrationBlock(paintingStage) {
+  if (paintingStage) {
+    return [
+      'Calibrate to the declared stage. Early washes: critique only big-shape design, value-mass planning, and what to protect.',
+      'Masses placed: critique value grouping, edge economy, and focal claim; darks and accents are still to come.',
+      'Refinement: critique what to stop touching, where freshness is at risk, and the order of remaining passes.',
+      'Final accents pending: critique only the placement, restraint, and sequencing of the last marks.'
+    ].join(' ');
+  }
+  return 'If the stage is not stated, infer it from coverage and paint density, state your assumption in one clause of sceneRead, and calibrate accordingly.';
 }
 
 function buildIdeationBriefBlock(painterNote) {
@@ -1732,6 +1752,7 @@ function buildInProcessPrompt(context) {
     'For teachingPoint, name one transferable principle the painter can carry beyond this image.',
     'For repaintHandoff, give 3 to 5 ordered next painting actions in one compact paragraph.',
     'For preserve and avoid, be specific about what should stay fresh and what action would damage the WIP further.',
+    buildStageCalibrationBlock(context.paintingStage),
     buildHistoryBlock(loadProgressSummary(), context.previousEntry),
     buildPainterBriefBlock(context.painterNote, context.paintingStage)
   ].filter(Boolean).join('\n');

@@ -66,10 +66,48 @@ prompt uses the value it already receives.
 
 - `node --check server/semantic-proxy.js`
 - `node server/semantic-proxy.js` starts clean.
-- Manual before/after: run In-Process critiques on 3 WIP photos (owner-
-  supplied) at different stages, before and after the prompt edit,
-  comparing the priority lesson and repaint handoff for incompleteness
-  framing. Record the comparison in this file once run.
+- Manual before/after: run In-Process critiques on owner-supplied WIP
+  photos at different stages, before and after the prompt edit, comparing
+  the priority lesson and repaint handoff for incompleteness framing.
+
+### Before/after comparison (run 2026-07-18)
+
+Owner supplied 2 real WIP photos of the same painting (`IMG_8587.jpeg`,
+`IMG_8593.jpeg`), each critiqued twice — once with `main`'s pre-Phase-4
+code (`PROMPT_VERSION 2.0`, via `git stash`) and once with this branch's
+code (`PROMPT_VERSION 3.0`) — same image, same declared stage, both
+requests otherwise identical.
+
+**IMG_8587.jpeg, stage "Masses placed — mid development"** (buildings
+blocked in, no connected darks yet):
+
+- Before (`valueStructureCritique`): *"The value structure is currently
+  flat and disconnected **because the shadow masses have not yet been
+  introduced** to anchor the buildings. The white gable end is a powerful
+  light, but **it lacks** a neighboring deep shadow to give it purpose and
+  structure."* — the absence of darks is framed as a present defect.
+- After (`valueStructureCritique`): *"The light and midtone masses are
+  well-established... However, the buildings currently stand as separate,
+  isolated value islands. **The upcoming shadow pass is your critical
+  opportunity** to link the left barn, the central white gable, and the
+  rightmost structures into a single, cohesive dark family."* — same
+  observation, reframed as forward sequencing guidance, not a fault.
+- Both versions are equally specific about which passages need
+  connecting; neither is vaguer or shorter.
+
+**IMG_8593.jpeg, stage "Refinement — most passages decided"** (darks
+already present, but fragmented — a real structural critique, not an
+incompleteness case either way):
+
+- Before and after both correctly critique the existing fragmented darks
+  ("isolated pockets of dark value" / "three separate dark spots") with
+  equal specificity — confirming the fix doesn't water down genuine
+  structural critique when the passages being critiqued actually exist.
+
+Conclusion: the core rule change produces exactly the intended effect —
+incompleteness reframed as sequencing guidance — without any loss of
+critique specificity on real structural issues. `promptVersion` confirmed
+`'3.0'` in the after-runs.
 
 ## Likely Files / Modules
 
