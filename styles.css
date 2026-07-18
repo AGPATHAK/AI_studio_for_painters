@@ -683,6 +683,22 @@ body.transitions-ready {
   resize: vertical;
 }
 
+.journal-title-suggested-tag[hidden] {
+  display: none;
+}
+
+.journal-title-suggested-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  color: var(--color-accent);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+
 .journal-rating {
   display: flex;
   flex-direction: column;

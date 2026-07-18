@@ -117,7 +117,8 @@ const SEMANTIC_SCHEMA = {
     repaintHandoff: { type: 'STRING' },
     preserve: { type: 'STRING' },
     avoid: { type: 'STRING' },
-    uncertaintyNote: { type: 'STRING' }
+    uncertaintyNote: { type: 'STRING' },
+    suggestedTitle: { type: 'STRING' }
   },
   required: [
     'priorityDiagnosis',
@@ -133,7 +134,8 @@ const SEMANTIC_SCHEMA = {
     'repaintHandoff',
     'preserve',
     'avoid',
-    'uncertaintyNote'
+    'uncertaintyNote',
+    'suggestedTitle'
   ]
 };
 
@@ -157,7 +159,8 @@ const STUDIO_CHECK_SCHEMA = {
     uncertaintyNote: { type: 'STRING' },
     signingRecommendation: { type: 'STRING' },
     finalAdjustments: { type: 'STRING' },
-    mediaOptions: { type: 'STRING' }
+    mediaOptions: { type: 'STRING' },
+    suggestedTitle: { type: 'STRING' }
   },
   required: [
     'priorityDiagnosis',
@@ -175,7 +178,8 @@ const STUDIO_CHECK_SCHEMA = {
     'avoid',
     'uncertaintyNote',
     'signingRecommendation',
-    'finalAdjustments'
+    'finalAdjustments',
+    'suggestedTitle'
   ]
 };
 
@@ -200,7 +204,8 @@ const ARCHIVE_SCHEMA = {
     strengths: { type: 'STRING' },
     studyAreas: { type: 'STRING' },
     nextExploration: { type: 'STRING' },
-    exhibitionNote: { type: 'STRING' }
+    exhibitionNote: { type: 'STRING' },
+    suggestedTitle: { type: 'STRING' }
   },
   required: [
     'priorityDiagnosis',
@@ -215,7 +220,8 @@ const ARCHIVE_SCHEMA = {
     'strengths',
     'studyAreas',
     'nextExploration',
-    'exhibitionNote'
+    'exhibitionNote',
+    'suggestedTitle'
   ]
 };
 
@@ -237,6 +243,8 @@ const REFERENCE_IDEATION_PROMPT = [
   'For cropIdeas, offer 1 or 2 compositional alternatives based on balance, asymmetry, tension, silhouette, or pathway. Do not list generic crops.',
   'For suppress and emphasize, be specific about what to remove, merge, quiet, or make structurally dominant.',
   'Keep paletteDirection limited and practical: restrained pigments, warm/cool orchestration, chroma hierarchy, and atmospheric greys where useful.',
+  'For suggestedTitle, give a short working title for this painting/motif: 2 to 5 words, concrete and studio-plain',
+  '(e.g. "Harbour at low tide", "Elm shadows, morning"). No dates, no quotes, no poetry.',
   'Avoid generic scene description, travel-writing tone, decorative adjectives, vague praise, AI-art phrasing, and phrases like beautiful, stunning, charming, picturesque, enhance, transform into, cinematic, masterpiece, highly detailed.',
   'Return JSON only, in the requested field order. Each field should be concise, visual, compositional, and useful before painting starts.'
 ].join(' ');
@@ -256,7 +264,8 @@ const REFERENCE_IDEATION_SCHEMA = {
     suppress: { type: 'STRING' },
     emphasize: { type: 'STRING' },
     abstractionOpportunities: { type: 'STRING' },
-    uncertaintyNote: { type: 'STRING' }
+    uncertaintyNote: { type: 'STRING' },
+    suggestedTitle: { type: 'STRING' }
   },
   required: [
     'sceneSummary',
@@ -271,7 +280,8 @@ const REFERENCE_IDEATION_SCHEMA = {
     'suppress',
     'emphasize',
     'abstractionOpportunities',
-    'uncertaintyNote'
+    'uncertaintyNote',
+    'suggestedTitle'
   ]
 };
 
@@ -1757,6 +1767,8 @@ function buildInProcessPrompt(context) {
     'For teachingPoint, name one transferable principle the painter can carry beyond this image.',
     'For repaintHandoff, give 3 to 5 ordered next painting actions in one compact paragraph.',
     'For preserve and avoid, be specific about what should stay fresh and what action would damage the WIP further.',
+    'For suggestedTitle, give a short working title for this painting/motif: 2 to 5 words, concrete and studio-plain',
+    '(e.g. "Harbour at low tide", "Elm shadows, morning"). No dates, no quotes, no poetry.',
     buildStageCalibrationBlock(context.paintingStage),
     buildHistoryBlock(loadProgressSummary(), context.previousEntry),
     buildPainterBriefBlock(context.painterNote, context.paintingStage)
@@ -1789,6 +1801,8 @@ function buildStudioCheckPrompt(context) {
     'For signingRecommendation, give a direct single verdict: sign now (with brief reason), one adjustment first (name it specifically), or step back (only if something structural is genuinely still wrong).',
     'For finalAdjustments, if adjustments are warranted, list at most three ordered bounded actions. Each names the passage, the action, and the medium if relevant.',
     'For mediaOptions, if pen, pastel, charcoal, gouache, or acrylic could help where watercolor cannot, name the passage, the action, and what to test first. Return empty string if nothing applies.',
+    'For suggestedTitle, give a short working title for this painting/motif: 2 to 5 words, concrete and studio-plain',
+    '(e.g. "Harbour at low tide", "Elm shadows, morning"). No dates, no quotes, no poetry.',
     buildHistoryBlock(loadProgressSummary(), context.previousEntry),
     buildPainterBriefBlock(context.painterNote, '')
   ].filter(Boolean).join('\n');
@@ -1820,6 +1834,8 @@ function buildFinishedCritiquePrompt(context) {
     'For studyAreas, name the recurring weakness patterns as practice directions for future studies and paintings.',
     'For nextExploration, gesture toward 1 or 2 compositional, tonal, or technical ideas this painting suggests for future work.',
     'For exhibitionNote, give one candid sentence on exhibition readiness — where this painting stands and what would change that.',
+    'For suggestedTitle, give a short working title for this painting/motif: 2 to 5 words, concrete and studio-plain',
+    '(e.g. "Harbour at low tide", "Elm shadows, morning"). No dates, no quotes, no poetry.',
     buildPainterBriefBlock(context.painterNote, '')
   ].filter(Boolean).join('\n');
 }
@@ -1899,7 +1915,8 @@ function normalizeSemanticResponse(raw, workflowMode = WORKFLOW_MODES.IN_PROGRES
     strengths: cleanText(safe.strengths, ''),
     studyAreas: cleanText(safe.studyAreas, ''),
     nextExploration: cleanText(safe.nextExploration, ''),
-    exhibitionNote: cleanText(safe.exhibitionNote, '')
+    exhibitionNote: cleanText(safe.exhibitionNote, ''),
+    suggestedTitle: cleanText(safe.suggestedTitle, '')
   };
 }
 

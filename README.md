@@ -15,7 +15,7 @@ Past v1. The app now runs a persistent studio-mentor loop across four workflow m
 
 Every mode also supports a one-click "suggest edit" → Gemini image-edit correction, and a printable Reference Sheet.
 
-On top of the four modes: a **Studio journal** (every critique is auto-saved locally, ratable, note-able), a **Journal view** with a "development areas" summary distilled from journal history and injected back into future critiques, and a scoped **"Ask the mentor" follow-up chat** after each critique. See [`docs/improvement-plan-mentor-v2.md`](docs/improvement-plan-mentor-v2.md) for the plan that shipped these, and [`docs/roadmap.md`](docs/roadmap.md) for the earlier milestone history (M0–M5).
+On top of the four modes: a **Studio journal** (every critique is auto-saved locally, ratable, note-able), a **Journal view** with a "development areas" summary distilled from journal history and injected back into future critiques, and a scoped **"Ask the mentor" follow-up chat** after each critique. Before reading, the painter can give the mentor a **pre-read brief** — an optional note (e.g. "suggest changes to the foreground only," or, in Reference Ideation, "this is an oil painting by Seago") and, in In-Process, a declared **development stage** that calibrates what the critique should even look at (a WIP is never faulted for not yet having darks it hasn't gotten to). Every critique also returns a **suggested title**, which auto-fills the journal's painting-title field (tagged "suggested" until confirmed) so session linking works without typing anything — continuity always prefers an already-established title over a fresh suggestion. See [`docs/improvement-plan-mentor-v2.md`](docs/improvement-plan-mentor-v2.md) and [`docs/improvement-plan-mentor-v3.md`](docs/improvement-plan-mentor-v3.md) for the plans that shipped these, and [`docs/roadmap.md`](docs/roadmap.md) for the earlier milestone history (M0–M5).
 
 ## Architecture
 
@@ -93,6 +93,7 @@ All endpoints are served by `server/semantic-proxy.js` under `/api/`:
 - [Design Philosophy](docs/design-philosophy.md)
 - [Roadmap (M0–M5, foundational build)](docs/roadmap.md)
 - [Mentor v2 Improvement Plan (studio journal, progress memory, chat, panel tiers)](docs/improvement-plan-mentor-v2.md)
+- [Mentor v3 Improvement Plan (idle-state fix, pre-read brief, auto-title, stage-aware/media-accent prompts)](docs/improvement-plan-mentor-v3.md)
 - [Brief](docs/brief.md)
 - [Decisions](docs/decisions.md)
 - [Workflow SOP (Solo-Light v7)](docs/workflow-sop.md)

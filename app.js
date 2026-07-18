@@ -163,6 +163,7 @@ const journalSection = document.getElementById('journal-section');
 const journalStatus = document.getElementById('journal-status');
 const journalTitleRow = document.getElementById('journal-title-row');
 const journalPaintingTitle = document.getElementById('journal-painting-title');
+const journalTitleSuggestedTag = document.getElementById('journal-title-suggested-tag');
 const journalRatingRow = document.getElementById('journal-rating-row');
 const journalRatingBtns = document.querySelectorAll('.journal-rating-btn');
 const journalNoteRow = document.getElementById('journal-note-row');
@@ -221,6 +222,7 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !aiNextExplItem || !aiNextExploration ||
     !aiExhibitionItem || !aiExhibitionNote ||
     !journalSection || !journalStatus || !journalTitleRow || !journalPaintingTitle ||
+    !journalTitleSuggestedTag ||
     !journalRatingRow || !journalRatingBtns.length || !journalNoteRow || !journalNote ||
     !chatSection || !chatTranscript || !chatStatus || !chatInput || !chatSendBtn ||
     !studioStage || !journalViewBtn || !journalViewPanel || !refreshSummaryBtn ||
@@ -495,7 +497,8 @@ function normalizeSemanticInterpretation(raw) {
     abstractionOpportunities: cleanUiText(safe.abstractionOpportunities),
     uncertaintyNote: cleanUiText(safe.uncertaintyNote),
     promptVersion: cleanUiText(safe.promptVersion),
-    model: cleanUiText(safe.model)
+    model: cleanUiText(safe.model),
+    suggestedTitle: cleanUiText(safe.suggestedTitle)
   };
 }
 
@@ -520,7 +523,8 @@ function normalizeInProcessCritique(raw) {
     preserve: cleanUiText(safe.preserve),
     avoid: cleanUiText(safe.avoid),
     uncertaintyNote: cleanUiText(safe.uncertaintyNote),
-    sceneSummary: cleanUiText(safe.sceneSummary)
+    sceneSummary: cleanUiText(safe.sceneSummary),
+    suggestedTitle: cleanUiText(safe.suggestedTitle)
   };
 }
 
@@ -549,7 +553,8 @@ function normalizeFinishedCritique(raw) {
     strengths: cleanUiText(safe.strengths),
     studyAreas: cleanUiText(safe.studyAreas),
     nextExploration: cleanUiText(safe.nextExploration),
-    exhibitionNote: cleanUiText(safe.exhibitionNote)
+    exhibitionNote: cleanUiText(safe.exhibitionNote),
+    suggestedTitle: cleanUiText(safe.suggestedTitle)
   };
 }
 
@@ -577,7 +582,8 @@ function normalizeStudioCheckCritique(raw) {
     sceneSummary: cleanUiText(safe.sceneSummary),
     signingRecommendation: cleanUiText(safe.signingRecommendation),
     finalAdjustments: cleanUiText(safe.finalAdjustments),
-    mediaOptions: cleanUiText(safe.mediaOptions)
+    mediaOptions: cleanUiText(safe.mediaOptions),
+    suggestedTitle: cleanUiText(safe.suggestedTitle)
   };
 }
 
@@ -928,6 +934,11 @@ function findPreviousPaintingId(filename) {
   return match ? match.paintingId : '';
 }
 
+function filenameStem(filename) {
+  if (!filename) return '';
+  return filename.replace(/\.[^./\\]+$/, '');
+}
+
 function makeThumbnailDataUrl(bitmap) {
   const longest = Math.max(bitmap.width, bitmap.height);
   const scale = Math.min(1, 800 / longest);
@@ -953,6 +964,7 @@ function hideJournalSection() {
   journalRatingRow.hidden = true;
   journalNoteRow.hidden = true;
   journalPaintingTitle.value = '';
+  journalTitleSuggestedTag.hidden = true;
   journalNote.value = '';
   setActiveRatingButton(null);
 }
@@ -962,8 +974,13 @@ async function saveJournalEntry(semantic, imageState, workflowMode, noteText = '
 
   try {
     const thumbnail = imageState.bitmap ? makeThumbnailDataUrl(imageState.bitmap) : '';
-    const prefill = findPreviousPaintingId(imageState.filename);
-    const paintingId = (journalPaintingTitle.value.trim() || prefill || appState.journal.lastPaintingId || null);
+    const typedTitle = journalPaintingTitle.value.trim();
+    const matchedPaintingId = findPreviousPaintingId(imageState.filename);
+    const establishedTitle = matchedPaintingId || appState.journal.lastPaintingId;
+    const suggestedTitle = cleanUiText(semantic.suggestedTitle);
+    const paintingId = typedTitle || establishedTitle || suggestedTitle ||
+      filenameStem(imageState.filename) || null;
+    const titleWasSuggested = !typedTitle && !establishedTitle && !!paintingId;
 
     const response = await fetch(getJournalSaveEndpoint(), {
       method: 'POST',
@@ -998,6 +1015,7 @@ async function saveJournalEntry(semantic, imageState, workflowMode, noteText = '
     });
     if (paintingId) appState.journal.lastPaintingId = paintingId;
     journalPaintingTitle.value = paintingId || '';
+    journalTitleSuggestedTag.hidden = !titleWasSuggested;
     journalNote.value = '';
     setActiveRatingButton(null);
     journalStatus.textContent = 'Saved to studio journal';
@@ -1047,6 +1065,10 @@ journalNote.addEventListener('blur', () => {
 
 journalPaintingTitle.addEventListener('blur', () => {
   updateJournalEntry({ paintingId: journalPaintingTitle.value.trim() || null });
+});
+
+journalPaintingTitle.addEventListener('input', () => {
+  journalTitleSuggestedTag.hidden = true;
 });
 
 /* ── Mentor follow-up chat ────────────────────────────────────────────────── */
@@ -1321,7 +1343,7 @@ async function toggleJournalEntry(id, wrapper, expandedEl) {
   }
 }
 
-function buildJournalEntryRow(summary) {
+function buildJournalEntryRow(summary, sessionCount = 0) {
   const wrapper = document.createElement('div');
   wrapper.className = 'journal-entry';
   wrapper.dataset.id = summary.id;
@@ -1340,8 +1362,11 @@ function buildJournalEntryRow(summary) {
   const meta = document.createElement('p');
   meta.className = 'journal-entry-meta';
   const modeLabel = MODE_LABELS[summary.workflowMode] || summary.workflowMode;
-  meta.textContent = [formatDateDDMMYYYY(summary.savedAt), modeLabel, summary.paintingId || summary.filename]
-    .filter(Boolean).join(' · ');
+  const metaParts = [formatDateDDMMYYYY(summary.savedAt), modeLabel, summary.paintingId || summary.filename];
+  if (summary.paintingId && sessionCount > 1) {
+    metaParts.push(`×${sessionCount} sessions`);
+  }
+  meta.textContent = metaParts.filter(Boolean).join(' · ');
 
   const diagnosis = document.createElement('p');
   diagnosis.className = 'journal-entry-diagnosis';
@@ -1370,12 +1395,22 @@ function buildJournalEntryRow(summary) {
   return wrapper;
 }
 
+function countEntriesByPaintingId(entries) {
+  const counts = new Map();
+  entries.forEach(e => {
+    if (!e.paintingId) return;
+    counts.set(e.paintingId, (counts.get(e.paintingId) || 0) + 1);
+  });
+  return counts;
+}
+
 function renderJournalEntryList() {
   const entries = appState.journal.entries;
   journalEntryListEmpty.hidden = entries.length > 0;
   journalEntryList.replaceChildren();
+  const counts = countEntriesByPaintingId(entries);
   entries.forEach(entry => {
-    journalEntryList.appendChild(buildJournalEntryRow(entry));
+    journalEntryList.appendChild(buildJournalEntryRow(entry, counts.get(entry.paintingId) || 0));
   });
 }
 
@@ -1409,10 +1444,15 @@ function findPreviousSessionsForActiveImage() {
   const activeImage = getActiveImageState();
   const filename = activeImage.filename || '';
   const paintingId = journalPaintingTitle.value.trim() || appState.journal.lastPaintingId || '';
-  if (!filename && !paintingId) return [];
-  return appState.journal.entries
-    .filter(e => (filename && e.filename === filename) || (paintingId && e.paintingId === paintingId))
-    .sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
+
+  const byPaintingId = paintingId
+    ? appState.journal.entries.filter(e => e.paintingId === paintingId)
+    : [];
+  const matches = byPaintingId.length
+    ? byPaintingId
+    : (filename ? appState.journal.entries.filter(e => e.filename === filename) : []);
+
+  return matches.sort((a, b) => (a.savedAt < b.savedAt ? 1 : -1));
 }
 
 function refreshPrevSessionsBlock() {
@@ -1427,8 +1467,12 @@ function refreshPrevSessionsBlock() {
     return;
   }
 
-  const dates = matches.slice(0, 3).map(e => formatDateDDMMYYYY(e.savedAt));
-  prevSessionsLabel.textContent = `Previous sessions of this painting: ${dates.join(', ')}`;
+  const mostRecent = matches[0];
+  const title = mostRecent.paintingId || mostRecent.filename || 'this painting';
+  const sessionWord = matches.length === 1 ? 'session' : 'sessions';
+  const modeLabel = MODE_LABELS[mostRecent.workflowMode] || mostRecent.workflowMode;
+  prevSessionsLabel.textContent =
+    `Linked painting: ${title} — ${matches.length} previous ${sessionWord} · most recent ${formatDateDDMMYYYY(mostRecent.savedAt)} (${modeLabel})`;
   prevSessionsBlock.hidden = false;
 }
 

@@ -96,6 +96,37 @@ through Phases 1/2/4/5 testing and the owner's own use.
   sessions header reads correctly; open Journal view and confirm the
   session-count badge appears on a painting with multiple entries.
 
+### Two bugs found and fixed during manual testing (2026-07-18)
+
+1. **`suggestedTitle` never reached the frontend for In-Process, Studio
+   Check, or Archive.** All three route through the proxy's shared
+   `normalizeSemanticResponse` (not the per-mode `normalize*` functions
+   in `app.js`), and that function was missing `suggestedTitle` entirely
+   — it was added to the four schemas/prompts but silently dropped on
+   the way out. First live test confirmed the symptom: `suggestedTitle`
+   came back empty in the saved entry even though it's a required schema
+   field. Fixed by adding `suggestedTitle: cleanText(safe.suggestedTitle, '')`
+   to `normalizeSemanticResponse`. Re-ran the same critique afterward —
+   `suggestedTitle` and the auto-filled title both populated correctly.
+2. **A fresh `suggestedTitle` could override an already-established
+   continuity title.** Original priority order put `suggestedTitle`
+   ahead of `appState.journal.lastPaintingId`, so re-uploading a
+   differently-named photo of a painting already titled this session
+   got a brand-new Gemini-suggested title instead of continuing the
+   established one — confirmed live: a second upload of "Farm Study A"
+   under a new filename got retitled "Barns under grey skies" before the
+   fix. Fixed by computing `establishedTitle` (filename-matched
+   `paintingId` OR `lastPaintingId`) and placing it ahead of
+   `suggestedTitle` in the priority chain — matching the plan's intent
+   that tier 1 ("current prefill behavior — keep") already included
+   `lastPaintingId`. Re-tested: the second upload correctly inherited
+   "Farm Study A," and the "Linked painting" header showed 2, then 3,
+   previous sessions across both filenames as more entries were added.
+
+Both fixes verified live end-to-end, including the Journal view's
+"×3 sessions" badge appearing correctly once three entries shared the
+same `paintingId`.
+
 ## Likely Files / Modules
 
 - `server/semantic-proxy.js` (modify — 4 schemas, 4 prompts)

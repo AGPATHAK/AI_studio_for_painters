@@ -201,6 +201,55 @@ Locked decisions, dated. Append-only. Earlier rows are not edited; they are supe
 
 ---
 
+## D12 — 2026-07-18 — Explicit `idle` semantic-status state, distinct from `unavailable`
+
+**Decision.** `appState.semanticStatus.state` gained a fourth value, `idle`, alongside `loading` / `succeeded` / `unavailable`. `unavailable` now means only "a request was made and failed" — never the default/no-request state. The four assignment sites that previously set `unavailable` as a default (initial `appState`, the upload handler, the reset handler, the mode-tab click handler) now set `idle`.
+
+**Why.**
+- The conflation was a real owner-reported bug: loading a fresh image in In-Process / Studio Check / Archive immediately showed "Gemini critique did not complete… no AI guidance was generated" before Read was ever pressed, because both "not yet requested" and "request failed" mapped to the same state value.
+- The existing copy-selection logic in `refreshInProcessCopy` / `refreshFinishedCopy` / `refreshStudioCheckCopy` already branched correctly on `unavailable` vs. everything else — once `idle` stopped aliasing `unavailable`, no other code changes were needed to fix the symptom.
+
+**Alternatives rejected.**
+- **Add a boolean `hasRequested` flag alongside the existing three-value state.** Two independent booleans (source/state) plus a third flag is more surface area than one four-value enum for the same information.
+
+**Revisit when.** A fifth distinct state is needed (e.g. a "stale — image changed since this result" state), at which point the enum should be reviewed as a whole rather than patched again.
+
+---
+
+## D13 — 2026-07-18 — Painter's pre-read brief (note + stage) as a focus instruction, not a standards override
+
+**Decision.** The optional "Note to mentor" textarea and (In-Process only) stage selector are sent with critique/follow-up requests and appended to the relevant prompt via wording that explicitly narrows focus without lowering standards: *"The brief narrows your focus; it does not change your standards."* Server-side, `painterNote` is capped at 500 characters and control characters are stripped; `paintingStage` is validated against a fixed whitelist of the four stage labels. Extended to Reference Ideation (initially out of scope in the plan, added on owner request) with ideation-appropriate wording rather than the critique-scoping wording used elsewhere, since Reference Ideation is not a critique.
+
+**Why.**
+- The owner's stated use cases are dual: a WIP-scoping instruction ("suggest changes to the foreground only") and, for Reference Ideation, contextual/creative direction ("this is an oil painting by Seago," "use a fresher palette") — two different intents that both fit "give the mentor a brief before it starts," but need different wrapping instructions so the mentor doesn't treat context-setting as a request to critique.
+- Free-text input reaching an LLM prompt is a real (if low-severity) injection surface; capping length and stripping control characters, plus the wrapping instruction constraining it to a focus signal, is the same defense-in-depth posture as the rest of the proxy's input handling.
+- Reference Ideation analyses automatically on upload with no separate "Read" step, so the note has to be captured before the upload handler clears the field for the next image — the field is cleared *after* the auto-analysis request is made, not before, specifically to support this mode.
+
+**Alternatives rejected.**
+- **Skip Reference Ideation entirely, as the plan explicitly allowed.** Reconsidered after the owner asked for it directly; the code path did not turn out to be complicated, so there was no reason to leave it out.
+- **One universal brief-wrapping instruction for all four modes.** Would have produced "do not critique" language inside a mode that is itself defined by not critiquing — confusing framing for no benefit.
+
+**Revisit when.** A mode needs a third kind of brief framing beyond "critique-scoping" and "ideation-direction," or the note needs to persist across a mode switch (currently: cleared only on a new image, not on tab switch — intentionally, so a brief typed in one mode can carry into a re-read in another mode of the same session).
+
+---
+
+## D14 — 2026-07-18 — Auto-title priority: established continuity beats a fresh suggestion
+
+**Decision.** `suggestedTitle` (a new required field on all four critique/ideation schemas) auto-fills the journal title field only when no stronger signal exists. Priority: a title the painter already typed > an established title (matched via filename to a previous entry, or the session's last-confirmed title) > the fresh `suggestedTitle` > a filename-stem fallback. A small "suggested" tag appears next to the label whenever the field wasn't filled by the painter's own typing, and disappears the moment they edit it.
+
+**Why.**
+- The point of auto-titling is continuity (linking sessions of the same painting), and continuity that already exists — a filename the journal has seen before, or a title the painter confirmed earlier in this sitting — is a stronger, more trustworthy signal than a brand-new guess from the current critique. Testing this live surfaced the failure mode directly: without the established-title tier ranked above `suggestedTitle`, re-uploading a differently-named photo of an already-titled painting got silently retitled to whatever Gemini suggested for that specific photo, breaking the very continuity the feature exists to support.
+- `suggestedTitle` had to be added to the proxy's shared `normalizeSemanticResponse` (used by In-Process, Studio Check, and Archive) separately from the per-mode schema/prompt additions — schema `required` alone does not guarantee a field survives every normalization step in the pipeline; this was also caught by live testing (the field was present in the schema and prompt but silently dropped before reaching the browser).
+- The suggested-tag (rather than silently overwriting or blocking the field) keeps the "user-typed title always wins, never silently overwritten" guarantee visible and legible, not just true in code.
+
+**Alternatives rejected.**
+- **suggestedTitle ahead of established continuity in the priority order** (the plan's literal phrasing, read narrowly). Rejected after live testing showed it breaks continuity across re-photographed WIPs — the plan's stated *intent* (tier 1 is "current prefill behavior — keep," which already included the last-confirmed-title fallback) was better served by ranking suggestedTitle below all continuity signals, not above them.
+- **Auto-confirm the suggested title without a visible tag.** Would make an AI guess indistinguishable from a painter's deliberate title, undermining the "never silently overwritten" guarantee.
+
+**Revisit when.** The journal needs to reconcile two paintings that were accidentally given the same title (a collision this priority chain does not detect or warn about).
+
+---
+
 ## Open Decisions
 
 These are flagged here so we don't waste time re-discovering them. None block M0; some block specific later milestones.
