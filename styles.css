@@ -203,6 +203,47 @@ body.transitions-ready {
   min-height: 1em;
 }
 
+.painter-brief[hidden] {
+  display: none;
+}
+
+.painter-brief {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.painter-brief-label {
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.painter-brief textarea,
+.painter-brief select {
+  font-family: var(--font-ui);
+  font-size: 0.78rem;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  resize: vertical;
+}
+
+.painting-stage-row[hidden] {
+  display: none;
+}
+
+.painting-stage-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 6px;
+}
+
 .prev-sessions-block[hidden] {
   display: none;
 }

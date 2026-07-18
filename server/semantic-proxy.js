@@ -580,6 +580,8 @@ async function handleInProcess(req, res) {
   }
 
   const previousEntry = resolvePreviousEntry(body.previousEntryId);
+  const painterNote = sanitizePainterNote(body.painterNote);
+  const paintingStage = sanitizePaintingStage(body.paintingStage);
 
   const critique = await callGeminiInProcessPass({
     wipImage,
@@ -588,7 +590,9 @@ async function handleInProcess(req, res) {
     referenceMimeType,
     mockupImage,
     mockupMimeType,
-    previousEntry
+    previousEntry,
+    painterNote,
+    paintingStage
   });
   console.log('APS proxy: in-process critique object created');
   sendApiJson(req, res, 200, critique);
@@ -628,6 +632,8 @@ async function handleFinishedCritique(req, res) {
     return;
   }
 
+  const painterNote = sanitizePainterNote(body.painterNote);
+
   const critique = await callGeminiFinishedPass({
     finishedImage,
     finishedMimeType,
@@ -636,7 +642,8 @@ async function handleFinishedCritique(req, res) {
     wipImage,
     wipMimeType,
     mockupImage,
-    mockupMimeType
+    mockupMimeType,
+    painterNote
   });
   console.log('APS proxy: finished critique object created');
   sendApiJson(req, res, 200, critique);
@@ -677,6 +684,7 @@ async function handleStudioCheck(req, res) {
   }
 
   const previousEntry = resolvePreviousEntry(body.previousEntryId);
+  const painterNote = sanitizePainterNote(body.painterNote);
 
   const critique = await callGeminiStudioCheckPass({
     finishedImage,
@@ -687,7 +695,8 @@ async function handleStudioCheck(req, res) {
     wipMimeType,
     mockupImage,
     mockupMimeType,
-    previousEntry
+    previousEntry,
+    painterNote
   });
   console.log('APS proxy: studio check critique object created');
   sendApiJson(req, res, 200, critique);
@@ -744,6 +753,7 @@ async function handleFollowup(req, res) {
   const critique = body.critique && typeof body.critique === 'object' ? body.critique : {};
   const history = Array.isArray(body.history) ? body.history : [];
   const question = typeof body.question === 'string' ? body.question.trim() : '';
+  const painterNote = sanitizePainterNote(body.painterNote);
 
   if (!image || !isSupportedImageMimeType(mimeType)) {
     sendApiJson(req, res, 400, { error: 'invalid_image' });
@@ -755,7 +765,7 @@ async function handleFollowup(req, res) {
     return;
   }
 
-  const answer = await callGeminiFollowup({ image, mimeType, workflowMode, critique, history, question });
+  const answer = await callGeminiFollowup({ image, mimeType, workflowMode, critique, history, question, painterNote });
   console.log('APS proxy: followup answer generated');
   sendApiJson(req, res, 200, answer);
 }
@@ -789,7 +799,9 @@ async function handleJournalSave(req, res) {
     critique,
     userNote: cleanText(body.userNote, ''),
     userRating: normalizeUserRating(body.userRating),
-    chat: Array.isArray(body.chat) ? body.chat : []
+    chat: Array.isArray(body.chat) ? body.chat : [],
+    painterNote: sanitizePainterNote(body.painterNote),
+    paintingStage: sanitizePaintingStage(body.paintingStage)
   };
 
   fs.writeFileSync(path.join(JOURNAL_ENTRIES_DIR, `${basename}.json`), JSON.stringify(entry, null, 2));
@@ -955,6 +967,43 @@ function buildHistoryBlock(progressSummary, previousEntry) {
   }
 
   return parts.join('\n');
+}
+
+const PAINTING_STAGE_VALUES = new Set([
+  'Early washes — big shapes only',
+  'Masses placed — mid development',
+  'Refinement — most passages decided',
+  'Final accents pending'
+]);
+
+function sanitizePainterNote(value) {
+  if (typeof value !== 'string') return '';
+  return value
+    .replace(/[\x00-\x1F\x7F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 500);
+}
+
+function sanitizePaintingStage(value) {
+  return typeof value === 'string' && PAINTING_STAGE_VALUES.has(value) ? value : '';
+}
+
+function buildPainterBriefBlock(painterNote, paintingStage) {
+  const parts = [];
+  if (painterNote) {
+    parts.push([
+      `The painter's brief for this session: '${painterNote}'.`,
+      'Respect it. Concentrate the critique where the painter asked.',
+      'Do not critique passages the painter has declared out of scope or not yet painted —',
+      'at most, flag a structural risk there in one sentence.',
+      'The brief narrows your focus; it does not change your standards.'
+    ].join(' '));
+  }
+  if (paintingStage) {
+    parts.push(`The painter states the painting is at this stage: ${paintingStage}.`);
+  }
+  return parts.join(' ');
 }
 
 function maybeAutoDistill() {
@@ -1542,14 +1591,17 @@ async function callGeminiMockupPass(imageBase64, mimeType, ideation) {
   };
 }
 
-async function callGeminiFollowup({ image, mimeType, workflowMode, critique, history, question }) {
-  const promptText = [
-    withProfile(FOLLOWUP_PROMPT, { doctrine: true, guardrail: true }),
+async function callGeminiFollowup({ image, mimeType, workflowMode, critique, history, question, painterNote }) {
+  const briefBlock = buildPainterBriefBlock(painterNote, '');
+  const promptLines = [withProfile(FOLLOWUP_PROMPT, { doctrine: true, guardrail: true })];
+  if (briefBlock) promptLines.push(briefBlock);
+  promptLines.push(
     '',
     `Workflow mode: ${workflowMode}.`,
     'Critique already given on this painting:',
     summarizeCritiqueForFollowup(critique)
-  ].join('\n');
+  );
+  const promptText = promptLines.join('\n');
 
   const parts = [
     { text: promptText },
@@ -1665,7 +1717,8 @@ function buildInProcessPrompt(context) {
     'For teachingPoint, name one transferable principle the painter can carry beyond this image.',
     'For repaintHandoff, give 3 to 5 ordered next painting actions in one compact paragraph.',
     'For preserve and avoid, be specific about what should stay fresh and what action would damage the WIP further.',
-    buildHistoryBlock(loadProgressSummary(), context.previousEntry)
+    buildHistoryBlock(loadProgressSummary(), context.previousEntry),
+    buildPainterBriefBlock(context.painterNote, context.paintingStage)
   ].filter(Boolean).join('\n');
 }
 
@@ -1695,7 +1748,8 @@ function buildStudioCheckPrompt(context) {
     'For signingRecommendation, give a direct single verdict: sign now (with brief reason), one adjustment first (name it specifically), or step back (only if something structural is genuinely still wrong).',
     'For finalAdjustments, if adjustments are warranted, list at most three ordered bounded actions. Each names the passage, the action, and the medium if relevant.',
     'For mediaOptions, if pen, pastel, charcoal, gouache, or acrylic could help where watercolor cannot, name the passage, the action, and what to test first. Return empty string if nothing applies.',
-    buildHistoryBlock(loadProgressSummary(), context.previousEntry)
+    buildHistoryBlock(loadProgressSummary(), context.previousEntry),
+    buildPainterBriefBlock(context.painterNote, '')
   ].filter(Boolean).join('\n');
 }
 
@@ -1724,8 +1778,9 @@ function buildFinishedCritiquePrompt(context) {
     'For strengths, name 2 to 4 specific passages, decisions, or qualities that succeeded — concrete enough to repeat.',
     'For studyAreas, name the recurring weakness patterns as practice directions for future studies and paintings.',
     'For nextExploration, gesture toward 1 or 2 compositional, tonal, or technical ideas this painting suggests for future work.',
-    'For exhibitionNote, give one candid sentence on exhibition readiness — where this painting stands and what would change that.'
-  ].join('\n');
+    'For exhibitionNote, give one candid sentence on exhibition readiness — where this painting stands and what would change that.',
+    buildPainterBriefBlock(context.painterNote, '')
+  ].filter(Boolean).join('\n');
 }
 
 function summarizeIdeationForMockup(ideation) {

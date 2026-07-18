@@ -187,6 +187,10 @@ const journalEntryListEmpty = document.getElementById('journal-entry-list-empty'
 const prevSessionsBlock = document.getElementById('prev-sessions-block');
 const prevSessionsLabel = document.getElementById('prev-sessions-label');
 const prevSessionsCheckbox = document.getElementById('prev-sessions-checkbox');
+const painterBrief = document.getElementById('painter-brief');
+const painterNote = document.getElementById('painter-note');
+const paintingStageRow = document.getElementById('painting-stage-row');
+const paintingStage = document.getElementById('painting-stage');
 
 // Guard: abort early if any required element is missing (catches future renames)
 if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
@@ -223,7 +227,8 @@ if (!fileInput || !uploadBtn || !resetBtn || !critiqueBtn || !themeBtn ||
     !progressGeneratedAt || !progressEmpty || !progressSections ||
     !progressPersistentList || !progressImprovingList || !progressStrengthsList ||
     !journalEntryList || !journalEntryListEmpty ||
-    !prevSessionsBlock || !prevSessionsLabel || !prevSessionsCheckbox) {
+    !prevSessionsBlock || !prevSessionsLabel || !prevSessionsCheckbox ||
+    !painterBrief || !painterNote || !paintingStageRow || !paintingStage) {
   console.error('APS: one or more required DOM elements not found.');
 }
 
@@ -691,6 +696,8 @@ async function requestInProcessCritique(file, bitmap, requestId) {
   console.log(`APS: in-process critique start #${requestId}`);
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+  const painterNoteText = currentPainterNote();
+  const paintingStageText = currentPaintingStage();
 
   try {
     const body = {
@@ -699,6 +706,8 @@ async function requestInProcessCritique(file, bitmap, requestId) {
       wipFilename: file.name,
       workflowMode: WORKFLOW_MODES.IN_PROGRESS_GUIDANCE
     };
+    if (painterNoteText) body.painterNote = painterNoteText;
+    if (paintingStageText) body.paintingStage = paintingStageText;
 
     addPreviousEntryId(body);
     await addOptionalContextImages(body);
@@ -722,7 +731,9 @@ async function requestInProcessCritique(file, bitmap, requestId) {
         source: 'gemini',
         state: 'succeeded',
         detail: ''
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: paintingStageText
     };
   } catch (err) {
     console.warn(`APS: in-process critique unavailable #${requestId}:`, err);
@@ -734,7 +745,9 @@ async function requestInProcessCritique(file, bitmap, requestId) {
         detail: err.name === 'AbortError'
           ? 'Gemini in-process critique timed out.'
           : `Gemini in-process critique failed: ${err.message || 'unknown error'}`
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: paintingStageText
     };
   } finally {
     console.log(`APS: in-process critique complete #${requestId}`);
@@ -746,6 +759,7 @@ async function requestFinishedCritique(file, bitmap, requestId) {
   console.log(`APS: finished critique start #${requestId}`);
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+  const painterNoteText = currentPainterNote();
 
   try {
     const body = {
@@ -754,6 +768,7 @@ async function requestFinishedCritique(file, bitmap, requestId) {
       finishedFilename: file.name,
       workflowMode: WORKFLOW_MODES.FINISHED_REVIEW
     };
+    if (painterNoteText) body.painterNote = painterNoteText;
 
     await addOptionalContextImages(body);
 
@@ -776,7 +791,9 @@ async function requestFinishedCritique(file, bitmap, requestId) {
         source: 'gemini',
         state: 'succeeded',
         detail: ''
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: ''
     };
   } catch (err) {
     console.warn(`APS: finished critique unavailable #${requestId}:`, err);
@@ -788,7 +805,9 @@ async function requestFinishedCritique(file, bitmap, requestId) {
         detail: err.name === 'AbortError'
           ? 'Gemini finished critique timed out.'
           : `Gemini finished critique failed: ${err.message || 'unknown error'}`
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: ''
     };
   } finally {
     console.log(`APS: finished critique complete #${requestId}`);
@@ -800,6 +819,7 @@ async function requestStudioCheckCritique(file, bitmap, requestId) {
   console.log(`APS: studio check start #${requestId}`);
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 60000);
+  const painterNoteText = currentPainterNote();
 
   try {
     const body = {
@@ -808,6 +828,7 @@ async function requestStudioCheckCritique(file, bitmap, requestId) {
       finishedFilename: file.name,
       workflowMode: WORKFLOW_MODES.PRE_SIGN
     };
+    if (painterNoteText) body.painterNote = painterNoteText;
 
     addPreviousEntryId(body);
     await addOptionalContextImages(body);
@@ -831,7 +852,9 @@ async function requestStudioCheckCritique(file, bitmap, requestId) {
         source: 'gemini',
         state: 'succeeded',
         detail: ''
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: ''
     };
   } catch (err) {
     console.warn(`APS: studio check unavailable #${requestId}:`, err);
@@ -843,7 +866,9 @@ async function requestStudioCheckCritique(file, bitmap, requestId) {
         detail: err.name === 'AbortError'
           ? 'Gemini studio check timed out.'
           : `Gemini studio check failed: ${err.message || 'unknown error'}`
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: ''
     };
   } finally {
     console.log(`APS: studio check complete #${requestId}`);
@@ -925,7 +950,7 @@ function hideJournalSection() {
   setActiveRatingButton(null);
 }
 
-async function saveJournalEntry(semantic, imageState, workflowMode) {
+async function saveJournalEntry(semantic, imageState, workflowMode, noteText = '', stageText = '') {
   if (!appState.journal.available) return;
 
   try {
@@ -946,7 +971,9 @@ async function saveJournalEntry(semantic, imageState, workflowMode) {
         thumbnail,
         userNote: '',
         userRating: null,
-        chat: []
+        chat: [],
+        painterNote: noteText,
+        paintingStage: stageText
       })
     });
     if (!response.ok) throw new Error(`journal save returned ${response.status}`);
@@ -1077,7 +1104,8 @@ async function sendChatMessage() {
         workflowMode: getWorkflowMode(),
         critique: appState.semantic,
         history: historyBeforeQuestion,
-        question
+        question,
+        painterNote: currentPainterNote()
       }),
       signal: controller.signal
     });
@@ -1579,12 +1607,35 @@ function hasStudioCheckCritique(semantic = appState.semantic) {
   );
 }
 
+function painterBriefSupported() {
+  return isInProcessMode() || isStudioCheckMode() || isFinishedMode();
+}
+
+function currentPainterNote() {
+  return painterBriefSupported() ? painterNote.value.trim() : '';
+}
+
+function currentPaintingStage() {
+  return isInProcessMode() ? paintingStage.value : '';
+}
+
+function clearPainterBrief() {
+  painterNote.value = '';
+  paintingStage.value = '';
+}
+
+function refreshPainterBrief() {
+  painterBrief.hidden = !painterBriefSupported();
+  paintingStageRow.hidden = !isInProcessMode();
+}
+
 function refreshWorkflowChrome() {
   const copy = getWorkflowCopy();
   critiquePanel.dataset.workflow = getWorkflowMode();
   panelKicker.textContent = copy.kicker;
   panelTitle.textContent = copy.title;
   fullReadDetails.open = isReferenceIdeationMode();
+  refreshPainterBrief();
   uploadBtn.textContent = '1 · ' + (isInProcessMode()
     ? 'Open WIP'
     : (isStudioCheckMode() ? 'Open painting'
@@ -2320,7 +2371,8 @@ async function rerunWorkflowAnalysis() {
   appState.semanticStatus = semanticResult.status;
   refreshCritiquePanel('analysis-ready');
   if (semanticResult.status.source === 'gemini') {
-    saveJournalEntry(appState.semantic, activeImage, getWorkflowMode());
+    saveJournalEntry(appState.semantic, activeImage, getWorkflowMode(),
+      semanticResult.painterNote || '', semanticResult.paintingStage || '');
   }
 }
 
@@ -2371,6 +2423,7 @@ fileInput.addEventListener('change', async () => {
     hideJournalSection();
     resetChatSection();
     resetPrevSessionsBlock();
+    clearPainterBrief();
 
     showCanvas();
     renderCurrentDisplay();
@@ -2394,7 +2447,8 @@ fileInput.addEventListener('change', async () => {
     console.log(`APS: critique render trigger from semantic completion #${requestId}`);
     refreshCritiquePanel('analysis-ready');
     if (semanticResult.status.source === 'gemini') {
-      saveJournalEntry(appState.semantic, activeImage, getWorkflowMode());
+      saveJournalEntry(appState.semantic, activeImage, getWorkflowMode(),
+        semanticResult.painterNote || '', semanticResult.paintingStage || '');
     }
 
   } catch (err) {
@@ -2448,6 +2502,7 @@ resetBtn.addEventListener('click', () => {
   hideJournalSection();
   resetChatSection();
   resetPrevSessionsBlock();
+  clearPainterBrief();
   showEmptyState();
 });
 

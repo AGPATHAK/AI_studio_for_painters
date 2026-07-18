@@ -7,7 +7,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'apsv1-shell-2026-07-18a';
+const CACHE_NAME = 'apsv1-shell-2026-07-18b';
 
 /** Files that make up the installable app shell. */
 const SHELL_FILES = [

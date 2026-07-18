@@ -39,6 +39,23 @@
                 <button class="btn-load" id="upload-btn">Open reference</button>
                 <p class="step-hint" id="empty-state" aria-live="polite">Load a JPG or PNG to begin</p>
               </div>
+
+              <div class="painter-brief" id="painter-brief" hidden>
+                <label for="painter-note" class="painter-brief-label">Note to mentor</label>
+                <textarea id="painter-note" rows="2" maxlength="500"
+                  placeholder="Optional — e.g. 'suggest changes to the foreground only', 'I plan to add darks last'"></textarea>
+                <div class="painting-stage-row" id="painting-stage-row" hidden>
+                  <label for="painting-stage" class="painter-brief-label">Stage</label>
+                  <select id="painting-stage">
+                    <option value="">(not stated)</option>
+                    <option value="Early washes — big shapes only">Early washes — big shapes only</option>
+                    <option value="Masses placed — mid development">Masses placed — mid development</option>
+                    <option value="Refinement — most passages decided">Refinement — most passages decided</option>
+                    <option value="Final accents pending">Final accents pending</option>
+                  </select>
+                </div>
+              </div>
+
               <div class="workflow-step">
                 <button class="btn-read" id="critique-btn" disabled>Explore</button>
                 <p class="step-hint" id="step-analyse-hint"></p>
