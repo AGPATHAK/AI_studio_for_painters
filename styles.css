@@ -227,6 +227,12 @@ body.transitions-ready {
   text-decoration: underline;
 }
 
+.prev-sessions-hint {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
 .prev-sessions-checkbox-row {
   display: flex;
   align-items: flex-start;
@@ -270,6 +276,11 @@ body.transitions-ready {
 .mode-tab-journal.is-active {
   color: var(--color-text);
   font-weight: 650;
+}
+
+.mode-tab-journal:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
 }
 
 /* ── Buttons ─────────────────────────────────────────────────────────────── */

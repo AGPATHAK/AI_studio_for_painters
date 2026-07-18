@@ -51,7 +51,9 @@ const appState = {
   semantic: null,       // current AI critique or reference ideation payload
   semanticStatus: {
     source: 'none',     // none | gemini
-    state: 'unavailable'
+    state: 'idle'        // idle | loading | succeeded | unavailable
+                         // 'unavailable' means a request was made and failed —
+                         // never the default/no-request state.
   },
   mockup: {
     status: 'idle',      // idle | loading | succeeded | failed
@@ -1430,6 +1432,8 @@ function refreshSemanticSource() {
     semanticSource.textContent = copy.sourceReady;
   } else if (status.state === 'unavailable') {
     semanticSource.textContent = status.detail || copy.sourceUnavailable;
+  } else if (status.state === 'idle' && getActiveImageState().bitmap) {
+    semanticSource.textContent = 'Mentor: ready';
   } else {
     semanticSource.textContent = 'Mentor: Gemini · waiting for image';
   }
@@ -1581,14 +1585,14 @@ function refreshWorkflowChrome() {
   panelKicker.textContent = copy.kicker;
   panelTitle.textContent = copy.title;
   fullReadDetails.open = isReferenceIdeationMode();
-  uploadBtn.textContent = isInProcessMode()
+  uploadBtn.textContent = '1 · ' + (isInProcessMode()
     ? 'Open WIP'
     : (isStudioCheckMode() ? 'Open painting'
-    : (isFinishedMode() ? 'Open signed work' : 'Open reference'));
-  critiqueBtn.textContent = isReferenceIdeationMode()
+    : (isFinishedMode() ? 'Open signed work' : 'Open reference')));
+  critiqueBtn.textContent = '2 · ' + (isReferenceIdeationMode()
     ? 'Explore'
     : (isInProcessMode() ? 'Read this painting'
-    : (isStudioCheckMode() ? 'Studio check' : 'Archive read'));
+    : (isStudioCheckMode() ? 'Studio check' : 'Archive read')));
 }
 
 function refreshReferenceIdeationCopy() {
@@ -2049,8 +2053,15 @@ function refreshMockupUi() {
   mockupBtn.hidden = !supportsAnnotatedMockup();
   mockupBtn.disabled = !canGenerateMockup();
   if (stepAnnotateHint) {
-    stepAnnotateHint.textContent = canGenerateMockup() ? '' :
-      (supportsAnnotatedMockup() && !!getActiveImageState().bitmap ? 'Analyse first' : '');
+    if (!supportsAnnotatedMockup() || canGenerateMockup() || appState.mockup.status === 'loading') {
+      stepAnnotateHint.textContent = '';
+    } else if (!getActiveImageState().bitmap) {
+      stepAnnotateHint.textContent = 'Load an image first';
+    } else if (isReferenceIdeationMode() && !appState.semantic) {
+      stepAnnotateHint.textContent = 'Read the painting first';
+    } else {
+      stepAnnotateHint.textContent = '';
+    }
   }
 
   const mockup = appState.mockup;
@@ -2238,7 +2249,7 @@ function showCanvas() {
   emptyState.hidden   = true;
   resetBtn.disabled   = false;
   critiqueBtn.disabled = false;
-  stepAnalyseHint.textContent = 'Read this reference';
+  stepAnalyseHint.textContent = '';
   refreshCanvasToggle();
   refreshWorkflowChrome();
 }
@@ -2250,7 +2261,7 @@ function showEmptyState() {
   canvasToggle.hidden = true;
   resetBtn.disabled   = true;
   critiqueBtn.disabled = true;
-  stepAnalyseHint.textContent = '';
+  stepAnalyseHint.textContent = 'Load an image first';
   canvas.width        = 0;
   canvas.height       = 0;
   refreshCritiquePanel('empty');
@@ -2354,7 +2365,7 @@ fileInput.addEventListener('change', async () => {
     activeImage.filename = file.name;
     activeImage.file     = file;
     appState.semantic       = null;
-    appState.semanticStatus = { source: 'none', state: 'unavailable' };
+    appState.semanticStatus = { source: 'none', state: 'idle' };
     resetPendingEdit();
     if (supportsAnnotatedMockup()) resetMockup();
     hideJournalSection();
@@ -2399,7 +2410,7 @@ fileInput.addEventListener('change', async () => {
       appState.image = makeEmptyImageState();
     }
     appState.semantic = null;
-    appState.semanticStatus = { source: 'none', state: 'unavailable' };
+    appState.semanticStatus = { source: 'none', state: 'idle' };
     appState.semanticRequestId += 1;
     resetPendingEdit();
     if (supportsAnnotatedMockup()) resetMockup();
@@ -2430,7 +2441,7 @@ resetBtn.addEventListener('click', () => {
     appState.image = makeEmptyImageState();
   }
   appState.semantic = null;
-  appState.semanticStatus = { source: 'none', state: 'unavailable' };
+  appState.semanticStatus = { source: 'none', state: 'idle' };
   appState.semanticRequestId += 1;
   resetPendingEdit();
   if (supportsAnnotatedMockup()) resetMockup();
@@ -2473,7 +2484,7 @@ modeTabs.forEach(tab => {
     if (modeActions && activeGroup) activeGroup.appendChild(modeActions);
     appState.displayMode = 'original';
     appState.semantic = null;
-    appState.semanticStatus = { source: 'none', state: 'unavailable' };
+    appState.semanticStatus = { source: 'none', state: 'idle' };
     resetPendingEdit();
     hideJournalSection();
     resetChatSection();
