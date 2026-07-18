@@ -611,21 +611,24 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
   console.log(`APS: semantic pass start #${requestId}`);
   const endpoint = getSemanticEndpoint();
   const workflowMode = getWorkflowMode();
+  const painterNoteText = currentPainterNote();
 
   const controller = new AbortController();
   const timeoutId = window.setTimeout(() => controller.abort(), 45000);
 
   try {
     const imageData = await fileToBase64(file);
+    const body = {
+      image: imageData,
+      mimeType: file.type,
+      filename: file.name,
+      workflowMode
+    };
+    if (painterNoteText) body.painterNote = painterNoteText;
     const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image: imageData,
-        mimeType: file.type,
-        filename: file.name,
-        workflowMode
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal
     });
     if (!response.ok) throw new Error(`semantic endpoint returned ${response.status}`);
@@ -642,7 +645,9 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
         source: 'gemini',
         state: 'succeeded',
         detail: ''
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: ''
     };
   } catch (err) {
     console.warn(`APS: semantic interpretation unavailable #${requestId}:`, err);
@@ -654,7 +659,9 @@ async function requestSemanticInterpretation(file, bitmap, requestId) {
         detail: err.name === 'AbortError'
           ? 'AI ideation timed out. Please retry.'
           : `AI ideation unavailable. ${err.message || 'Please retry.'}`
-      }
+      },
+      painterNote: painterNoteText,
+      paintingStage: ''
     };
   } finally {
     console.log(`APS: semantic pass complete #${requestId}`);
@@ -1608,7 +1615,7 @@ function hasStudioCheckCritique(semantic = appState.semantic) {
 }
 
 function painterBriefSupported() {
-  return isInProcessMode() || isStudioCheckMode() || isFinishedMode();
+  return isReferenceIdeationMode() || isInProcessMode() || isStudioCheckMode() || isFinishedMode();
 }
 
 function currentPainterNote() {
@@ -2423,7 +2430,6 @@ fileInput.addEventListener('change', async () => {
     hideJournalSection();
     resetChatSection();
     resetPrevSessionsBlock();
-    clearPainterBrief();
 
     showCanvas();
     renderCurrentDisplay();
@@ -2432,10 +2438,14 @@ fileInput.addEventListener('change', async () => {
     if (isInProcessMode() || isStudioCheckMode() || isFinishedMode()) {
       refreshCritiquePanel('loaded');
       fileInput.value = '';
+      clearPainterBrief();
       return;
     }
 
+    // Reference Ideation analyses automatically on upload, so the note
+    // must be read by requestSemanticInterpretation before it is cleared here.
     const semanticResult = await requestSemanticInterpretation(file, bitmap, requestId);
+    clearPainterBrief();
     if (requestId !== appState.semanticRequestId || bitmap !== getActiveImageState().bitmap) {
       console.log(`APS: stale semantic result ignored #${requestId}`);
       fileInput.value = '';

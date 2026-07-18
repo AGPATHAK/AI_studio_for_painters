@@ -81,9 +81,27 @@ the stage being available — this issue supplies it).
 - No UI surfacing of `painterNote`/`paintingStage` in the Journal entry
   list or expanded view — the plan only asks that the saved record
   contain them, not that they render yet.
-- Reference Ideation does not get a note field (plan explicitly allows
-  skipping it; there is no request-path change for that mode).
 - No changes to mockup or correction features.
+
+**Addendum (post-review):** the owner asked for the note field on
+Reference Ideation too — e.g. "this is an oil painting by Seago" (context
+about the source) or "use a fresher palette" (a creative preference for
+the ideation). The plan explicitly allowed skipping this mode if it
+complicated the code path; it didn't, so it's included:
+- `painterBriefSupported()` now includes Reference Ideation. The stage
+  row stays In-Process-only (a WIP-development concept that doesn't apply
+  before painting starts).
+- Reference Ideation analyses automatically on upload (no separate Read
+  click), so the upload handler had to change order: capture the note via
+  `requestSemanticInterpretation` (which reads it synchronously at
+  function entry) *before* clearing it, not after. The other three modes
+  still clear immediately on upload since no request has fired yet.
+- Proxy: `/api/semantic` reads `painterNote`; `callGeminiSemanticPass`
+  appends an ideation-appropriate brief ("use it as context/direction,
+  don't treat it as a request to critique") for Reference Ideation
+  specifically, not the critique-scoping wording used elsewhere.
+- Placeholder text broadened to cover both the context-note and
+  creative-preference use cases, not just WIP scoping.
 
 ## Data / State / API Model
 
@@ -106,7 +124,9 @@ the stage being available — this issue supplies it).
   background commentary shrinks to at most a one-line risk flag.
 - Note and stage appear in the saved journal JSON for that entry.
 - Follow-up chat answers respect the same brief.
-- Reference Ideation is unaffected (no note field, no body changes).
+- Reference Ideation shows the note field (no stage row); a note typed
+  before upload survives to inform that upload's automatic analysis and
+  is cleared afterward.
 - A 600-character note is capped to 500 server-side and doesn't error.
 
 ## Validation Method
@@ -118,8 +138,8 @@ the stage being available — this issue supplies it).
   confirm the response concentrates where asked and the saved journal
   JSON has both fields. Repeat for Studio Check and Archive (note only,
   no stage row). Ask a follow-up question and confirm the answer respects
-  the note. Confirm Reference Ideation shows no note field and behaves as
-  before.
+  the note. In Reference Ideation, type a note before uploading and
+  confirm it reaches the automatic analysis and then clears.
 
 ## Likely Files / Modules
 

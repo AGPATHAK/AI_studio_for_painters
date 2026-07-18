@@ -510,13 +510,14 @@ async function handleSemantic(req, res) {
   const image = typeof body.image === 'string' ? body.image.trim() : '';
   const mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
   const workflowMode = normalizeWorkflowMode(body.workflowMode);
+  const painterNote = sanitizePainterNote(body.painterNote);
 
   if (!image || !['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) {
     sendApiJson(req, res, 400, { error: 'invalid_image' });
     return;
   }
 
-  const semantic = await callGeminiSemanticPass(image, mimeType, workflowMode);
+  const semantic = await callGeminiSemanticPass(image, mimeType, workflowMode, painterNote);
   console.log(`APS proxy: ${workflowMode} object created`);
   sendApiJson(req, res, 200, semantic);
 }
@@ -1006,6 +1007,16 @@ function buildPainterBriefBlock(painterNote, paintingStage) {
   return parts.join(' ');
 }
 
+function buildIdeationBriefBlock(painterNote) {
+  if (!painterNote) return '';
+  return [
+    `The painter's brief for this session: '${painterNote}'.`,
+    'Use it as context and direction for your ideation — it may describe the reference itself',
+    '(medium, artist, source) or a creative preference (palette, mood, approach) for interpreting it.',
+    'Weave it into your suggestions naturally. Do not treat it as a request to critique anything.'
+  ].join(' ');
+}
+
 function maybeAutoDistill() {
   if (!process.env.GEMINI_API_KEY) return;
 
@@ -1220,8 +1231,12 @@ async function callGeminiImageEdit(imageBase64, mimeType, prompt) {
   };
 }
 
-async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode) {
-  const prompt = promptForWorkflow(workflowMode);
+async function callGeminiSemanticPass(imageBase64, mimeType, workflowMode, painterNote = '') {
+  const basePrompt = promptForWorkflow(workflowMode);
+  const briefBlock = workflowMode === WORKFLOW_MODES.REFERENCE_IDEATION
+    ? buildIdeationBriefBlock(painterNote)
+    : buildPainterBriefBlock(painterNote, '');
+  const prompt = briefBlock ? `${basePrompt}\n${briefBlock}` : basePrompt;
   const schema = schemaForWorkflow(workflowMode);
   const temperature = workflowMode === WORKFLOW_MODES.REFERENCE_IDEATION ? 0.45 : 0.2;
 
