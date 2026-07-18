@@ -76,6 +76,28 @@ rendered and printed).
   `mediaOptions` populates with specific, testable suggestions consistent
   with the signing verdict; confirm the panel and print sheet display it.
 
+### Manual run (2026-07-18)
+
+Two near-final paintings, both real (`IMG_8593.jpeg`, and an Arc de
+Triomphe watercolor already in the studio journal):
+
+- **Painting 1** — `signingRecommendation`: *"One adjustment first: soften
+  the outer roofline of the left barn and slightly knock back the
+  starkness of the white gable wall."* `mediaOptions`: *"White gable
+  wall: use a soft, light-grey or cream pastel dragged lightly over the
+  lower half... Test the pastel's value on a scrap of toned paper first."*
+- **Painting 2** — `signingRecommendation`: *"One adjustment first: anchor
+  the isolated left figure to the foreground shadow mass with a small,
+  dark dry-brush connection at the feet."* `mediaOptions`: *"Left figure
+  feet: use a dark, water-soluble pencil (like 4B or 8B) to draw a quick,
+  dry, horizontal shadow line... Test on scrap paper to ensure the line
+  is soft and dry, not hard and graphic."*
+
+Both: concrete passage + specific medium + scrap-paper test, one accent
+each, consistent with the paired signing verdict, `promptVersion` `'3.0'`.
+Confirmed in the browser that the "Media options" section renders in the
+right panel when populated (previously usually empty and hidden).
+
 ## Likely Files / Modules
 
 - `server/semantic-proxy.js` (modify — `STUDIO_CHECK_PROMPT` only)
