@@ -83,6 +83,7 @@ All endpoints are served by `server/semantic-proxy.js` under `/api/`:
 - `manifest.webmanifest` — PWA manifest
 - `service-worker.js` — offline caching of app shell (not of API responses or journal data)
 - `icons/` — app icons
+- `fonts/` — self-hosted Cormorant Garamond and Lora (woff2), so the type in `styles.css` works fully offline with no Google Fonts network call
 - `server/semantic-proxy.js` — dependency-free Node HTTP server: serves the static app, proxies all Gemini calls, owns the studio journal on disk
 - `server/painter-profile.json` — this painter's skill level, tradition, and taste, injected into every critique prompt
 - `server/doctrine.js` — studio judgment rules injected into critique/studio-check/archive/followup prompts

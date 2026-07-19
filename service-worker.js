@@ -7,7 +7,7 @@
 
 'use strict';
 
-const CACHE_NAME = 'apsv1-shell-2026-07-18c';
+const CACHE_NAME = 'apsv1-shell-2026-07-19a';
 
 /** Files that make up the installable app shell. */
 const SHELL_FILES = [
@@ -18,7 +18,9 @@ const SHELL_FILES = [
   './manifest.webmanifest',
   './icons/icon.svg',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './fonts/cormorant-garamond-v21-latin.woff2',
+  './fonts/lora-v37-latin.woff2'
 ];
 
 /* ── Install ──────────────────────────────────────────────────────────────── */

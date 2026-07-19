@@ -1,34 +1,61 @@
 /* ==========================================================================
    AI Painter Studio — styles.css
-   Light/dark via CSS custom properties.  No external dependencies.
-   Palette: muted studio tones — warm off-white / charcoal with warm accents.
+   Editorial "Classical" restyle: Cormorant Garamond headings over Lora
+   body, hairline rules, color as stroke rather than fill.
+   Fonts are self-hosted (./fonts) so the app keeps working fully offline —
+   no Google Fonts network dependency.
    ========================================================================== */
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("fonts/cormorant-garamond-v21-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Lora";
+  font-style: normal;
+  font-weight: 400 600;
+  font-display: swap;
+  src: url("fonts/lora-v37-latin.woff2") format("woff2");
+}
 
 /* ── Custom properties (light theme defaults) ───────────────────────────── */
 :root {
   /* Backgrounds */
-  --color-bg:          #f4f1ed;   /* warm off-white — like primed linen */
-  --color-surface:     #ece8e2;   /* slightly darker — header, left panel */
-  --color-surface-2:   #e2ddd6;   /* hover / pressed states */
-  --color-border:      #cec7bd;   /* subtle rule */
+  --color-bg:          #f3f2f2;   /* soft near-white ground */
+  --color-surface:     #eae9e9;   /* header, left panel */
+  --color-surface-2:   #e0dcdc;   /* hover / pressed states */
+  --color-border:      color-mix(in srgb, #201f1d 16%, transparent); /* hairline */
 
   /* Text */
-  --color-text:        #1c1917;   /* near-black, warm */
-  --color-text-muted:  #78706a;   /* secondary / placeholder */
+  --color-text:        #201f1d;   /* near-black, warm */
+  --color-text-muted:  #605d5d;   /* secondary / placeholder */
 
-  /* Accent — warm sienna-brown */
-  --color-accent:      #7c5c4a;
-  --color-accent-hover:#6a4e3e;
-  --color-accent-text: #f4f1ed;   /* text on accent bg */
+  /* Accent — warm gold-sienna, used as stroke not fill */
+  --color-accent:      #b68235;
+  --color-accent-hover:#a06f24;
+  --color-accent-text: #f3f2f2;   /* text on the rare filled accent surface */
+  --color-accent-tint: #fff3e4;   /* light tag/tint background */
+  --color-accent-deep: #5a3b0a;   /* text on tinted accent background */
+
+  /* Radius */
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 8px;
 
   /* Layout */
-  --header-height:    48px;
+  --header-height:    56px;
   --left-panel-width: 220px;
   --panel-width:      300px;
 
   /* Typography */
-  --font-ui: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI',
-             Roboto, Helvetica, Arial, sans-serif;
+  --font-heading: "Cormorant Garamond", Georgia, serif;
+  --font-heading-weight: 600;
+  --font-body: "Lora", Georgia, serif;
+  --font-ui: var(--font-body);
 }
 
 /* ── Dark theme overrides ────────────────────────────────────────────────── */
@@ -36,14 +63,16 @@
   --color-bg:          #1c1917;   /* deep charcoal — studio at night */
   --color-surface:     #27231f;
   --color-surface-2:   #332e29;
-  --color-border:      #3d3730;
+  --color-border:      color-mix(in srgb, #e8e2d8 18%, transparent);
 
   --color-text:        #e8e2d8;
   --color-text-muted:  #9c9288;
 
-  --color-accent:      #b8956a;   /* warm gold on dark */
-  --color-accent-hover:#caa87e;
+  --color-accent:      #cba36f;
+  --color-accent-hover:#dbb887;
   --color-accent-text: #1c1917;
+  --color-accent-tint: color-mix(in srgb, #cba36f 16%, transparent);
+  --color-accent-deep: #f0dcc0;
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -60,11 +89,13 @@ html, body {
 }
 
 body {
-  font-family: var(--font-ui);
+  font-family: var(--font-body);
   font-size: 14px;
   background: var(--color-bg);
   color: var(--color-text);
 }
+
+::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
 
 body.transitions-ready {
   transition: background-color 0.2s ease, color 0.2s ease;
@@ -88,10 +119,10 @@ body.transitions-ready {
 
 .app-title {
   flex: 1;
-  font-size: 0.9rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
   color: var(--color-text);
 }
 
@@ -146,9 +177,9 @@ body.transitions-ready {
   padding: 7px 10px 7px 12px;
   background: transparent;
   border: none;
-  border-radius: 5px;
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-heading);
+  font-size: 0.92rem;
   font-weight: 500;
   color: var(--color-text-muted);
   text-align: left;
@@ -162,7 +193,7 @@ body.transitions-ready {
 }
 
 .mode-tab.is-active {
-  font-size: 0.82rem;
+  font-size: 0.98rem;
   padding: 9px 10px 9px 12px;
   color: var(--color-text);
   font-weight: 650;
@@ -296,8 +327,8 @@ body.transitions-ready {
   border: none;
   border-top: 1px solid var(--color-border);
   border-radius: 0;
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
+  font-family: var(--font-heading);
+  font-size: 0.92rem;
   font-weight: 500;
   color: var(--color-text-muted);
   text-align: left;
@@ -332,11 +363,11 @@ body.transitions-ready {
   width: 48px;
   height: 32px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--color-text);
-  font-family: var(--font-ui);
-  font-size: 0.75rem;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.12s ease, border-color 0.12s ease,
@@ -364,20 +395,19 @@ body.transitions-ready {
   cursor: not-allowed;
 }
 
-/* Primary — accent fill */
+/* Primary — accent outline, never a fill */
 .btn-primary {
-  background: var(--color-accent);
+  background: transparent;
   border-color: var(--color-accent);
-  color: var(--color-accent-text);
+  color: var(--color-accent-deep);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 .btn-primary:active:not(:disabled) {
-  background: var(--color-accent-hover);
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 
 /* Icon — borderless, SVG face */
@@ -401,16 +431,16 @@ body.transitions-ready {
 
 /* ── Left-panel action buttons ───────────────────────────────────────────── */
 
-/* Primary: load/open an image */
+/* Primary: load/open an image — accent outline, never a fill */
 .btn-load {
   width: 100%;
   padding: 11px 14px;
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  border: none;
-  border-radius: 8px;
-  font-family: var(--font-ui);
-  font-size: 0.875rem;
+  background: transparent;
+  color: var(--color-accent-deep);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: 0.01em;
   text-align: left;
@@ -419,7 +449,7 @@ body.transitions-ready {
 }
 
 .btn-load:hover {
-  background: var(--color-accent-hover);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 /* Secondary: trigger AI analysis */
@@ -429,9 +459,9 @@ body.transitions-ready {
   background: transparent;
   color: var(--color-text);
   border: 1px solid var(--color-border);
-  border-radius: 6px;
-  font-family: var(--font-ui);
-  font-size: 0.84rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -453,11 +483,11 @@ body.transitions-ready {
   width: 100%;
   padding: 9px 14px;
   background: transparent;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   border: 1px solid color-mix(in srgb, var(--color-accent) 38%, var(--color-border));
-  border-radius: 6px;
-  font-family: var(--font-ui);
-  font-size: 0.84rem;
+  border-radius: var(--radius-md);
+  font-family: var(--font-heading);
+  font-size: 0.95rem;
   font-weight: 500;
   text-align: left;
   cursor: pointer;
@@ -544,9 +574,9 @@ body.transitions-ready {
   border-right: 1px solid var(--color-border);
   background: transparent;
   color: var(--color-text-muted);
-  font-family: var(--font-ui);
-  font-size: 0.78rem;
-  font-weight: 650;
+  font-family: var(--font-heading);
+  font-size: 0.88rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -555,8 +585,9 @@ body.transitions-ready {
 }
 
 .canvas-toggle-btn.is-active {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
+  background: transparent;
+  color: var(--color-accent-deep);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
 }
 
 .canvas-toggle-btn:disabled {
@@ -610,17 +641,19 @@ body.transitions-ready {
 
 .panel-title {
   color: var(--color-text);
-  font-size: 1rem;
-  font-weight: 650;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 1.35rem;
   line-height: 1.2;
 }
 
 
 .panel-copy {
   color: var(--color-text);
-  font-size: 1rem;
+  font-family: var(--font-heading);
   font-weight: 600;
-  line-height: 1.5;
+  font-size: 1.15rem;
+  line-height: 1.4;
 }
 
 .semantic-source {
@@ -690,10 +723,11 @@ body.transitions-ready {
 .journal-title-suggested-tag {
   display: inline-block;
   margin-left: 6px;
-  padding: 1px 6px;
+  padding: 1px 8px;
+  border: 1px solid var(--color-accent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
-  color: var(--color-accent);
+  background: transparent;
+  color: var(--color-accent-deep);
   font-weight: 600;
   letter-spacing: 0.03em;
   text-transform: none;
@@ -712,12 +746,12 @@ body.transitions-ready {
 }
 
 .journal-rating-btn {
-  font-family: var(--font-ui);
-  font-size: 0.76rem;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
   color: var(--color-text-muted);
-  background: var(--color-surface);
+  background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 4px 10px;
   cursor: pointer;
   transition: color 0.12s ease, border-color 0.12s ease;
@@ -755,8 +789,9 @@ body.transitions-ready {
   width: 100%;
   height: auto;
   margin-top: 10px;
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border: 6px solid var(--color-surface);
+  outline: 1px solid var(--color-border);
+  border-radius: 0;
   background: var(--color-surface);
 }
 
@@ -885,13 +920,15 @@ body.transitions-ready {
 
 .chat-turn-painter {
   align-self: flex-end;
-  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 45%, transparent);
   color: var(--color-text);
 }
 
 .chat-turn-mentor {
   align-self: flex-start;
-  background: color-mix(in srgb, var(--color-surface) 65%, transparent);
+  background: transparent;
+  border: 1px solid var(--color-border);
   color: var(--color-text);
 }
 
@@ -925,13 +962,13 @@ body.transitions-ready {
 }
 
 .chat-input-row button {
-  font-family: var(--font-ui);
-  font-size: 0.82rem;
+  font-family: var(--font-heading);
+  font-size: 0.9rem;
   font-weight: 650;
-  color: var(--color-accent);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
+  color: var(--color-accent-deep);
+  background: transparent;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
   padding: 6px 12px;
   cursor: pointer;
 }
@@ -1004,8 +1041,8 @@ body.transitions-ready {
 
 .progress-card {
   border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  border-radius: var(--radius-lg);
+  background: transparent;
   padding: 16px 18px;
   max-width: 640px;
 }
@@ -1018,13 +1055,13 @@ body.transitions-ready {
 }
 
 .btn-refresh-summary {
-  font-family: var(--font-ui);
-  font-size: 0.76rem;
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--color-accent);
-  background: var(--color-surface);
+  color: var(--color-accent-deep);
+  background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   padding: 5px 11px;
   cursor: pointer;
 }
@@ -1111,7 +1148,7 @@ body.transitions-ready {
 
 .journal-entry {
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
 }
 
@@ -1136,7 +1173,7 @@ body.transitions-ready {
 .journal-entry-thumb {
   width: 56px;
   height: 56px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   object-fit: cover;
   background: var(--color-surface-2);
   flex-shrink: 0;
@@ -1167,7 +1204,7 @@ body.transitions-ready {
 
 .journal-entry-rating {
   font-size: 0.7rem;
-  color: var(--color-accent);
+  color: var(--color-accent-deep);
   margin-top: 3px;
 }
 
@@ -1432,12 +1469,12 @@ body.transitions-ready {
   display: inline-block;
   margin-top: 6px;
   padding: 3px 8px;
-  font-size: 0.72rem;
-  font-family: var(--font-ui);
-  color: var(--color-accent);
+  font-size: 0.78rem;
+  font-family: var(--font-heading);
+  color: var(--color-accent-deep);
   background: none;
   border: 1px solid color-mix(in srgb, var(--color-accent) 35%, transparent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.1s ease;
 }
@@ -1449,9 +1486,10 @@ body.transitions-ready {
 .edit-request-preview {
   margin-top: 10px;
   padding: 10px 12px;
-  background: var(--color-surface-2);
+  background: transparent;
+  border: 1px solid var(--color-border);
   border-left: 2px solid var(--color-accent);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   font-size: 0.78rem;
   line-height: 1.5;
 }
@@ -1485,12 +1523,12 @@ body.transitions-ready {
 
 .btn-apply-edit {
   padding: 4px 10px;
-  font-size: 0.75rem;
-  font-family: var(--font-ui);
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  border: none;
-  border-radius: 5px;
+  font-size: 0.8rem;
+  font-family: var(--font-heading);
+  background: transparent;
+  color: var(--color-accent-deep);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: opacity 0.1s ease;
 }
